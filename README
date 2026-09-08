@@ -1,1 +1,58 @@
-Pour l'affichage de l'occupation des refectoires
+# Widget Réfectoires
+
+## Fonction
+Ce widget lit directement les tables du fichier Grist :
+- `Salles`
+- `Usagers`
+- `Repartitions`
+- `Annees`
+
+Il permet :
+- de choisir le réfectoire ;
+- de choisir l'année ;
+- de choisir A4 ou A3 en portrait ;
+- d'imprimer ou enregistrer en PDF ;
+- d'afficher la photo de la salle sur toute la largeur, sans déformation ;
+- d'afficher les portraits des usagers affectés à la salle avec leur prénom ;
+- d'ajouter le logo de l'association depuis le widget.
+
+## Colonnes attendues
+### Salles
+- `Nom_de_la_salle`
+- `Photo` (optionnel : si vide, le widget utilise les photos fournies dans `assets/`)
+
+### Usagers
+- `Prenom`
+- `Portrait`
+
+### Repartitions
+- `Usagers` (Ref:Usagers)
+- `Salles` (Ref:Salles)
+- `Annees` (Ref:Annees)
+
+### Annees
+- `Annee`
+
+## Mise en ligne sur GitHub Pages
+1. Copie le dossier `widget-repas-saj` dans ton dépôt GitHub.
+2. Active GitHub Pages sur la branche `main`.
+3. Dans Grist : Ajouter un widget > Personnalisé.
+4. Mets l'URL publique vers `widget-repas-saj/index.html`.
+5. Autorise l'accès **Lecture de la table**.
+
+## Photos de salle
+La priorité est :
+1. la photo renseignée dans `Salles.Photo` ;
+2. sinon la photo locale correspondante dans `assets/`.
+
+## Logo
+Le logo choisi via le bouton « Logo association » est mémorisé dans les options du widget.
+Pour de bonnes performances, utiliser un PNG/JPG/SVG léger (idéalement < 500 ko).
+
+
+## Affichage panoramique des salles
+Les photos de salle occupent 100 % de la largeur du document dans un bandeau panoramique.
+Le widget utilise `object-fit: cover` : la photo n'est jamais étirée ni déformée ; elle est seulement recadrée en haut et en bas si nécessaire pour remplir le bandeau.
+- Écran : hauteur panoramique responsive.
+- A4 portrait : bandeau de 72 mm de haut.
+- A3 portrait : bandeau de 105 mm de haut.

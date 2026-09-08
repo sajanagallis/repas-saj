@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Réfectoires - SAJ Anagallis</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <header class="toolbar no-print">
+    <div class="brand">
+      <div class="brand-mark">SAJ</div>
+      <div>
+        <h1>Réfectoires</h1>
+        <p>SAJ Anagallis</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label>
+        Salle
+        <select id="roomSelect">
+          <option value="">Chargement…</option>
+        </select>
+      </label>
+
+      <label>
+        Année
+        <select id="yearSelect">
+          <option value="">Toutes</option>
+        </select>
+      </label>
+
+      <label>
+        Format
+        <select id="formatSelect">
+          <option value="a4">A4 portrait</option>
+          <option value="a3">A3 portrait</option>
+        </select>
+      </label>
+
+      <label class="logo-control">
+        Logo association
+        <input id="logoInput" type="file" accept="image/*">
+      </label>
+
+      <button id="printBtn" type="button">Imprimer / PDF</button>
+      <button id="reloadBtn" type="button" class="secondary">Actualiser</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <section id="status" class="status">Connexion à Grist…</section>
+
+    <section id="sheet" class="sheet hidden">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">SAJ Anagallis · Organisation du repas</p>
+          <h2 id="roomTitle">Réfectoire</h2>
+          <p id="yearText" class="muted"></p>
+        </div>
+        <div class="logo-wrap">
+          <img id="siteLogo" class="site-logo hidden" alt="Logo de l'association">
+          <div id="logoPlaceholder" class="logo-placeholder">LOGO</div>
+        </div>
+      </div>
+
+      <figure class="room-visual">
+        <img id="roomPhoto" alt="Photo du réfectoire">
+        <figcaption id="roomCaption"></figcaption>
+      </figure>
+
+      <div class="people-heading">
+        <div>
+          <p class="eyebrow">Personnes accueillies</p>
+          <h3>Qui déjeune dans cette salle ?</h3>
+        </div>
+        <span id="countBadge" class="count-badge">0 personne</span>
+      </div>
+
+      <div id="peopleGrid" class="people-grid"></div>
+
+      <footer class="sheet-foot">
+        Odynéo · Les Tourrais de Craponne · Service d'accueil de Jour Anagallis
+      </footer>
+    </section>
+  </main>
+
+  <dialog id="errorDialog">
+    <h3>Impossible de charger le widget</h3>
+    <pre id="errorText"></pre>
+    <button onclick="this.closest('dialog').close()">Fermer</button>
+  </dialog>
+
+  <script src="script.js"></script>
+</body>
+</html>
