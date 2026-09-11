@@ -88,7 +88,7 @@ function setPrintFormat(format) {
     style.id = "dynamicPageStyle";
     document.head.appendChild(style);
   }
-  style.textContent = `@page { size: ${format === "a3" ? "A3" : "A4"} portrait; margin: ${format === "a3" ? "9mm" : "8mm"}; }`;
+  style.textContent = `@page { size: ${format === "a3" ? "A3 landscape" : "A4 portrait"}; margin: ${format === "a3" ? "8mm" : "8mm"}; }`;
 }
 
 function populateSelectors() {
@@ -216,12 +216,34 @@ async function render() {
       name.className = "person-name";
       name.textContent = person.Prenom || person.Usager || person.Usagers || "—";
 
+      const infos = document.createElement("div");
+      infos.className = "person-infos";
+
+      const regime = String(person.Regime || "").trim();
+      if (regime) {
+        const regimeEl = document.createElement("div");
+        regimeEl.className = "person-info person-info-regime";
+        regimeEl.textContent = regime;
+        infos.appendChild(regimeEl);
+      }
+
+      if (Boolean(person.aide_au_repas)) {
+        const aideEl = document.createElement("div");
+        aideEl.className = "person-info person-info-aide";
+        aideEl.textContent = "Aide au repas";
+        infos.appendChild(aideEl);
+      }
+
       card.append(photo, name);
+      if (infos.children.length) card.appendChild(infos);
       grid.appendChild(card);
     }
   }
 
   el("countBadge").textContent = `${people.length} ${people.length > 1 ? "personnes" : "personne"}`;
+
+  document.body.classList.toggle("many-people", people.length > 20);
+  document.body.classList.toggle("very-many-people", people.length > 28);
 
   el("status").classList.add("hidden");
   el("sheet").classList.remove("hidden");

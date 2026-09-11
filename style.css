@@ -430,3 +430,161 @@ dialog pre {
     font-size: 11px;
   }
 }
+
+
+/* Informations repas sous le portrait */
+.person-infos {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.person-info {
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 700;
+  padding: 3px 5px;
+  border-radius: 5px;
+}
+
+.person-info-regime {
+  background: #fff5d9;
+  color: #6b5314;
+  border: 1px solid #f1dfaa;
+}
+
+.person-info-aide {
+  background: #eaf4fb;
+  color: #215d82;
+  border: 1px solid #c8e1ef;
+}
+
+@media print {
+  /* A3 = paysage et une seule page */
+  body.print-a3 {
+    width: auto;
+    height: auto;
+  }
+
+  body.print-a3 .sheet {
+    width: 100%;
+    max-width: none;
+    height: 281mm;
+    max-height: 281mm;
+    overflow: hidden;
+    display: flex !important;
+    flex-direction: column;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+
+  body.print-a3 .sheet-head {
+    flex: 0 0 auto;
+    min-height: 22mm;
+    padding-bottom: 5mm;
+  }
+
+  body.print-a3 .room-visual {
+    flex: 0 0 auto;
+  }
+
+  body.print-a3 .room-visual img {
+    width: 100%;
+    height: 88mm;
+    object-fit: cover;
+    object-position: center center;
+  }
+
+  body.print-a3 .people-heading {
+    flex: 0 0 auto;
+    margin: 5mm 0 3mm;
+  }
+
+  body.print-a3 .people-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-content: start;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 3mm;
+    overflow: hidden;
+  }
+
+  body.print-a3 .person-card {
+    min-height: 0;
+    padding: 2.2mm 1.5mm 2mm;
+    gap: 1.2mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.print-a3 .person-photo {
+    width: 24mm;
+    height: 24mm;
+  }
+
+  body.print-a3 .person-name {
+    font-size: 10.5px;
+  }
+
+  body.print-a3 .person-info {
+    font-size: 8.2px;
+    padding: 1.2mm 1mm;
+    line-height: 1.08;
+  }
+
+  body.print-a3 .sheet-foot {
+    flex: 0 0 auto;
+    margin-top: 2.5mm;
+    padding-top: 1.5mm;
+  }
+
+  /* Si le nombre de personnes augmente, on compacte automatiquement
+     tout en gardant la feuille A3 sur UNE SEULE PAGE. */
+  body.print-a3.many-people .room-visual img {
+    height: 78mm;
+  }
+
+  body.print-a3.many-people .people-grid {
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 2.2mm;
+  }
+
+  body.print-a3.many-people .person-photo {
+    width: 21mm;
+    height: 21mm;
+  }
+
+  body.print-a3.many-people .person-name {
+    font-size: 9px;
+  }
+
+  body.print-a3.many-people .person-info {
+    font-size: 7.4px;
+  }
+
+  body.print-a3.very-many-people .room-visual img {
+    height: 68mm;
+  }
+
+  body.print-a3.very-many-people .people-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1.8mm;
+  }
+
+  body.print-a3.very-many-people .person-photo {
+    width: 18mm;
+    height: 18mm;
+  }
+
+  body.print-a3.very-many-people .person-name {
+    font-size: 8px;
+  }
+
+  body.print-a3.very-many-people .person-info {
+    font-size: 6.8px;
+  }
+}
