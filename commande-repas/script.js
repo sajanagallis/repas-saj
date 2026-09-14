@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V18 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V24 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -21,7 +21,6 @@ let repartitions=[],rooms=[];
 let saveTimer=null;
 let archiveEditUnlocked=false;
 let screenGroupSort={RDC:'name','1er étage':'name',Professionnel:'name','Stagiaire / Visiteur':'name'};
-let templateGroupFilter='all',templateSort='name';
 let templateGroupSort={RDC:'name','1er étage':'name',Professionnel:'name'};
 let settingsGroupFilter='all',settingsActiveFilter='all',settingsSort='name';
 const $=id=>document.getElementById(id);
@@ -192,12 +191,6 @@ function templateCommandRecord(p,key,day){
 
 function inferFloor(userId){const rep=repartitions.find(r=>+r.Usagers===+userId);const room=rooms.find(s=>+s.id===+rep?.Salles);const name=String(room?.Nom_de_la_salle||room?.Nom||'').toLowerCase();return /1er|étage|etage/.test(name)?'1er étage':'RDC'}
 
-async function ensureRollingWeeks(count=8){
-  const start=mondayOf(new Date());
-  let created=0;
-  for(let i=1;i<=count;i++){ if(await ensureWeek(addDays(start,i*7))) created++; }
-  return created;
-}
 async function ensureWeek(date){
   const key=weekKey(date); if(weeks.some(w=>w.SemaineKey===key))return false;
   const now=new Date(),iso=now.toISOString(),monday=parseKey(key);
@@ -269,7 +262,18 @@ function renderClosureBanners(){
   els.forEach(e=>{e.hidden=false;e.textContent=text});
 }
 function currentWeek(){return weeks.find(w=>w.SemaineKey===weekKey(weekStart))}
-function currentCommands(){return commands.filter(c=>c.SemaineKey===weekKey(weekStart))}
+function commandCompositeKey(c){return `${c.SemaineKey||''}|${c.PersonKey||''}|${c.Jour||''}`}
+function dedupeCommandRows(rows){
+  const map=new Map();
+  for(const row of rows){
+    const key=commandCompositeKey(row);
+    const prev=map.get(key);
+    // En cas de doublon historique, conserver l'enregistrement le plus récent (id le plus élevé).
+    if(!prev || (+row.id||0)>(+prev.id||0)) map.set(key,row);
+  }
+  return [...map.values()];
+}
+function currentCommands(){return dedupeCommandRows(commands.filter(c=>c.SemaineKey===weekKey(weekStart)))}
 function currentGuests(){return guests.filter(g=>g.SemaineKey===weekKey(weekStart)&&g.Actif!==false)}
 
 function renderEditor(){
@@ -320,9 +324,18 @@ function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.Type
 
 async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const type=e.target.value;const old=commands.find(x=>x.id===id);if(!old)return;await updateCmd(id,{TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(old.HeureRetrait||''):'',Pain:type==='Pique-nique'?(old.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(old.OptionPique||''):''},`Type de repas : ${old.TypeCommande} → ${type}`)}
 async function onExtraChange(e){const id=+(e.target.dataset.timeId||e.target.dataset.breadId||e.target.dataset.picnicId);const field=e.target.dataset.timeId?'HeureRetrait':e.target.dataset.breadId?'Pain':'OptionPique';const old=commands.find(x=>x.id===id);await updateCmd(id,{[field]:e.target.value},`${field} : ${old?.[field]||'—'} → ${e.target.value||'—'}`)}
-async function updateCmd(id,fields,detail='Modification de repas'){const old=commands.find(x=>+x.id===+id);if(!old)return;await grist.docApi.applyUserActions([['UpdateRecord',TABLES.cmd,id,fields]]);await logAudit({action:'Modification',row:old,oldValue:JSON.stringify(pickFields(old,fields)),newValue:JSON.stringify(fields),detail});await touchWeek(true);await loadAll();renderCommande();saved()}
+async function updateCmd(id,fields,detail='Modification de repas'){
+  const old=commands.find(x=>+x.id===+id);if(!old)return;
+  // Sécurité d'enregistrement : si une ancienne version a créé des doublons pour la même
+  // personne / semaine / jour, on met à jour TOUS les doublons. Cela évite qu'une valeur
+  // ancienne (par ex. « Absent ») réapparaisse après rechargement.
+  const siblings=commands.filter(x=>x.SemaineKey===old.SemaineKey&&x.PersonKey===old.PersonKey&&x.Jour===old.Jour);
+  const actions=(siblings.length?siblings:[old]).map(r=>['UpdateRecord',TABLES.cmd,r.id,fields]);
+  await grist.docApi.applyUserActions(actions);
+  await logAudit({action:'Modification',row:old,oldValue:JSON.stringify(pickFields(old,fields)),newValue:JSON.stringify(fields),detail});
+  await touchWeek(true);await loadAll();renderCommande();showSavedState();
+}
 function pickFields(row,fields){const o={};Object.keys(fields).forEach(k=>o[k]=row?.[k]);return o}
-async function savePersonNote(e){const key=e.target.dataset.notePerson;const rows=currentCommands().filter(x=>x.PersonKey===key);if(!rows.length)return;const note=e.target.value.trim();const actions=rows.map(r=>['UpdateRecord',TABLES.cmd,r.id,{NoteCuisine:note}]);await grist.docApi.applyUserActions(actions);await logAudit({action:'Note cuisine',row:rows[0],oldValue:rows[0].NoteCuisine||'',newValue:note,detail:'Modification de la note cuisine'});await touchWeek(true);await loadAll();renderPrint();saved()}
 
 function renderPrint(){
   const c=currentCommands();$('summaryContent').innerHTML=summaryHtml(c);$('detailContent').innerHTML=detailHtml(c);
@@ -383,7 +396,7 @@ function dotClass(v,kind){const n=norm(v);if(kind==='diet'){if(n==='hypocaloriqu
 
 
 
-// V13 — séparation stricte entre régime et texture.
+// Normalisation stricte entre régime et texture.
 // Régimes : Normal, Sans viande, Sans porc, Hypocalorique, Hypolipidique.
 // Textures : Normale, Purée lisse, Haché lubrifié.
 function canonicalDiet(v){
@@ -578,11 +591,6 @@ function renderTemplateEditor(){
   document.querySelectorAll('#templateSettings [data-remove-permanent]').forEach(x=>x.onclick=()=>removePermanentPerson(x.dataset.removePermanent));
   renderTemplateMeta();
 }
-function bindTemplateControls(){
-  const g=$('templateGroupFilter'),s=$('templateSort');
-  if(g)g.onchange=e=>{templateGroupFilter=e.target.value;renderTemplateEditor()};
-  if(s)s.onchange=e=>{templateSort=e.target.value;renderTemplateEditor()};
-}
 function templateDayCell(row,p,d){
   const type=row?.TypeCommande || (p[d.key]?'Repas sur place':'Absent');
   const mealClass='meal-'+norm(type).replace(/[^a-z0-9]+/g,'-');
@@ -598,12 +606,11 @@ async function createTemplateType(e){
   const fields={PersonKey:personKey,Jour:day,TypeCommande:type,HeureRetrait:'',Pain:type==='Pique-nique'?'Pain':'',OptionPique:'',NoteCuisine:''};
   await grist.docApi.applyUserActions([['AddRecord',TABLES.template,null,fields]]);
   await saveSetting('templateLastSaved',new Date().toISOString());
-  await loadAll();renderTemplateEditor();showTemplateSaved();
+  await loadAll();renderTemplateEditor();
 }
 function templateExtrasHtml(r){if(!['Plateau','Container','Pique-nique'].includes(r.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-template-time="${r.id}" value="${esc(r.HeureRetrait||'')}">`;if(r.TypeCommande==='Pique-nique')s+=`<select data-template-bread="${r.id}"><option ${r.Pain==='Pain'?'selected':''}>Pain</option><option ${r.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-template-picnic="${r.id}"><option value="" ${!r.OptionPique?'selected':''}>Standard</option><option ${r.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${r.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
-async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();showTemplateSaved();toast('Semaine habituelle enregistrée. Les semaines déjà créées ne sont pas modifiées.');}
-async function saveTemplateExtra(e){const id=+(e.target.dataset.templateTime||e.target.dataset.templateBread||e.target.dataset.templatePicnic);const field=e.target.dataset.templateTime?'HeureRetrait':e.target.dataset.templateBread?'Pain':'OptionPique';await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,{[field]:e.target.value}]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateMeta();showTemplateSaved();toast('Semaine habituelle enregistrée.');}
-async function saveTemplateNote(e){const key=e.target.dataset.templateNote;const rows=templateRows.filter(r=>r.PersonKey===key);if(!rows.length)return;const note=e.target.value.trim();await grist.docApi.applyUserActions(rows.map(r=>['UpdateRecord',TABLES.template,r.id,{NoteCuisine:note}]));await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateMeta();showTemplateSaved();toast('Note de la semaine habituelle enregistrée.');}
+async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();toast('Semaine habituelle enregistrée. Les semaines déjà créées ne sont pas modifiées.');}
+async function saveTemplateExtra(e){const id=+(e.target.dataset.templateTime||e.target.dataset.templateBread||e.target.dataset.templatePicnic);const field=e.target.dataset.templateTime?'HeureRetrait':e.target.dataset.templateBread?'Pain':'OptionPique';await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,{[field]:e.target.value}]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateMeta();toast('Semaine habituelle enregistrée.');}
 
 function renderTemplateMeta(){
   const el=$('templateMeta');if(!el)return;
@@ -613,45 +620,13 @@ function renderTemplateMeta(){
   const lastText=last?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date(last)):'jamais';
   el.innerHTML=`<span><b>${people.length}</b> personne${people.length>1?'s':''} active${people.length>1?'s':''}</span><span><b>${mealCount}</b> repas habituels sur la semaine</span><span>Dernier enregistrement : <b>${esc(lastText)}</b></span>`;
 }
-function showTemplateSaved(){
-  const ok=$('saveTemplateOk');if(!ok)return;
-  ok.hidden=false;
-}
 async function saveTemplateExplicitly(){
   const btn=$('saveTemplateBtn');if(!btn)return;
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
     await saveSetting('templateLastSaved',new Date().toISOString());
-    await loadAll();renderTemplateMeta();showTemplateSaved();toast('Semaine habituelle enregistrée.');
+    await loadAll();renderTemplateMeta();toast('Semaine habituelle enregistrée.');
   }finally{btn.disabled=false;btn.textContent='Enregistrer la semaine habituelle';}
-}
-async function resetTemplateFromPresence(){
-  if(!confirm('Initialiser toute la semaine habituelle depuis les jours de présence habituels ? Les réglages actuels de la semaine habituelle seront remplacés. Les semaines déjà créées resteront inchangées.'))return;
-  const actions=[];
-  for(const p of config.filter(x=>x.Actif!==false)){
-    for(const d of DAYS){
-      const row=templateFor(p.PersonKey,d.key);
-      const fields={TypeCommande:p[d.key]?'Repas sur place':'Absent',HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:row?.NoteCuisine||''};
-      if(row)actions.push(['UpdateRecord',TABLES.template,row.id,fields]);
-      else actions.push(['AddRecord',TABLES.template,null,{PersonKey:p.PersonKey,Jour:d.key,...fields}]);
-    }
-  }
-  if(actions.length)await grist.docApi.applyUserActions(actions);
-  await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();showTemplateSaved();toast('Semaine habituelle initialisée depuis les présences habituelles.');
-}
-async function copyCurrentWeekToTemplate(){
-  const rows=currentCommands().filter(r=>!String(r.PersonKey||'').startsWith('G:'));
-  if(!rows.length){toast('Aucune commande à copier pour la semaine sélectionnée.');return;}
-  if(!confirm(`Copier ${weekLabel(weekStart)} vers la semaine habituelle ? Cela remplacera les réglages habituels des personnes présentes dans cette commande. Les autres semaines ne seront pas modifiées.`))return;
-  const actions=[];
-  for(const r of rows){
-    const t=templateFor(r.PersonKey,r.Jour);
-    const fields={TypeCommande:r.TypeCommande||'Absent',HeureRetrait:r.HeureRetrait||'',Pain:r.Pain||'Pain',OptionPique:r.OptionPique||'',NoteCuisine:r.NoteCuisine||''};
-    if(t)actions.push(['UpdateRecord',TABLES.template,t.id,fields]);
-    else actions.push(['AddRecord',TABLES.template,null,{PersonKey:r.PersonKey,Jour:r.Jour,...fields}]);
-  }
-  if(actions.length)await grist.docApi.applyUserActions(actions);
-  await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();showTemplateSaved();toast('La semaine sélectionnée a été copiée dans la semaine habituelle.');
 }
 
 function renderLogo(){
@@ -722,29 +697,70 @@ async function saveWeekStatus(){
     }else{throw err}
   }
   await logAudit({action:'Statut',oldValue:old,newValue:status,detail:`Statut : ${old} → ${status}`});
-  await loadAll();renderAll();saved();
+  await loadAll();renderAll();showSavedState();
 }
+async function flushVisibleOrderSelections(){
+  const actions=[];
+  document.querySelectorAll('#editor select[data-order-id]').forEach(sel=>{
+    const id=+sel.dataset.orderId;
+    const row=commands.find(x=>+x.id===id);
+    if(!row)return;
+    const type=sel.value;
+    if(type===row.TypeCommande)return;
+    const fields={
+      TypeCommande:type,
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',
+      Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',
+      OptionPique:type==='Pique-nique'?(row.OptionPique||''):''
+    };
+    const siblings=commands.filter(x=>x.SemaineKey===row.SemaineKey&&x.PersonKey===row.PersonKey&&x.Jour===row.Jour);
+    (siblings.length?siblings:[row]).forEach(r=>actions.push(['UpdateRecord',TABLES.cmd,r.id,fields]));
+  });
+  if(actions.length)await grist.docApi.applyUserActions(actions);
+  return actions.length;
+}
+
 async function saveCurrentWeekExplicitly(){
-  const btn=$('saveWeekBtn'), ok=$('saveWeekOk'), w=currentWeek();
+  const btn=$('saveWeekBtn'), w=currentWeek();
   if(!w)return;
   clearTimeout(saveTimer);
-  btn.classList.add('saving'); btn.disabled=true; btn.textContent='Enregistrement…'; ok.hidden=true;
+  btn.classList.add('saving');btn.disabled=true;btn.textContent='Enregistrement…';
   try{
-    const actions=[]; const now=new Date(); const fields={};
-    const status=$('weekStatus').value; const comment=$('weekComment').value;
-    if(status!==effectiveWeekStatus(w)&&status!=='Archivée'){fields.Statut=status;if(status==='Commandée'){fields.CommandeeLe=now.toISOString();fields.CommandeeLeDT=gristDateTime(now)}}
-    if(comment!==(w.Commentaire||''))fields.Commentaire=comment;
-    if(Object.keys(fields).length){fields.ModifieLe=now.toISOString();fields.ModifieLeDT=gristDateTime(now);fields.ControleOK=false;if(w.CommandeeLeDT)fields.Rectificative=true;actions.push(['UpdateRecord',TABLES.weeks,w.id,fields]);}
-    if(actions.length){await grist.docApi.applyUserActions(actions);await logAudit({action:'Enregistrement manuel',oldValue:'',newValue:'',detail:'Commande enregistrée depuis le bouton Enregistrer'});await loadAll();renderAll();}
-    ok.hidden=false; $('saveState').textContent='✓ Modifications enregistrées';
+    // 1) Forcer l'enregistrement de la valeur réellement visible dans chaque menu repas.
+    // Cela sécurise notamment les changements effectués juste avant le clic sur Enregistrer.
+    const mealUpdates=await flushVisibleOrderSelections();
+
+    // 2) Enregistrer les métadonnées de la semaine (statut / commentaire).
+    const now=new Date();const fields={};
+    const freshWeek=weeks.find(x=>x.SemaineKey===weekKey(weekStart))||w;
+    const status=$('weekStatus').value;const comment=$('weekComment').value;
+    if(status!==effectiveWeekStatus(freshWeek)&&status!=='Archivée'){
+      fields.Statut=status;
+      if(status==='Commandée'){fields.CommandeeLe=now.toISOString();fields.CommandeeLeDT=gristDateTime(now)}
+    }
+    if(comment!==(freshWeek.Commentaire||''))fields.Commentaire=comment;
+    if(Object.keys(fields).length||mealUpdates){
+      fields.ModifieLe=now.toISOString();fields.ModifieLeDT=gristDateTime(now);fields.ControleOK=false;
+      if(freshWeek.CommandeeLeDT)fields.Rectificative=true;
+      if(Object.keys(fields).length)await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,freshWeek.id,fields]]);
+      await logAudit({action:'Enregistrement manuel',detail:'Commande enregistrée depuis le bouton Enregistrer'});
+    }
+    await loadAll();renderAll();
+    // Confirmation discrète uniquement dans la zone d'état : aucun bouton/pastille « Enregistré ».
+    showSavedState();
   }catch(err){console.error(err);toast('Échec de l’enregistrement : '+err.message)}
   finally{btn.classList.remove('saving');btn.disabled=false;btn.textContent='Enregistrer'}
 }
 
 function debounceSaveComment(){clearTimeout(saveTimer);$('saveState').textContent='Enregistrement…';saveTimer=setTimeout(saveWeekComment,500)}
-async function saveWeekComment(){const w=currentWeek();if(!w)return;const now=new Date();const old=w.Commentaire||'',val=$('weekComment').value;await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{Commentaire:val,ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false,Rectificative:w.CommandeeLeDT?true:!!w.Rectificative}]]);await logAudit({action:'Commentaire',oldValue:old,newValue:val,detail:'Commentaire cuisine modifié'});await loadAll();renderPrint();saved()}
+async function saveWeekComment(){const w=currentWeek();if(!w)return;const now=new Date();const old=w.Commentaire||'',val=$('weekComment').value;await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{Commentaire:val,ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false,Rectificative:w.CommandeeLeDT?true:!!w.Rectificative}]]);await logAudit({action:'Commentaire',oldValue:old,newValue:val,detail:'Commentaire cuisine modifié'});await loadAll();renderPrint();showSavedState()}
 async function touchWeek(markRectificative=false){const w=currentWeek();if(w){const now=new Date();const fields={ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false};if(markRectificative&&w.CommandeeLeDT)fields.Rectificative=true;await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,fields]])}}
-function saved(){$('saveState').textContent='Modifications enregistrées';setTimeout(()=>{$('saveState').textContent=''},1800)}
+function showSavedState(message='Modifications enregistrées'){
+  const el=$('saveState');if(!el)return;
+  el.textContent=message;
+  clearTimeout(showSavedState._timer);
+  showSavedState._timer=setTimeout(()=>{if(el)el.textContent=''},1800);
+}
 
 async function resetWeekFromTemplate(){if(!confirm('Réinitialiser cette semaine depuis la semaine modèle ? Les modifications de cette semaine seront remplacées.'))return;const key=weekKey(weekStart);const old=currentCommands();const actions=old.map(x=>['RemoveRecord',TABLES.cmd,x.id]);if(actions.length)await grist.docApi.applyUserActions(actions);await createWeekRows(key);await recreateGuestCommands();await logAudit({action:'Réinitialisation',detail:'Semaine réinitialisée depuis la semaine modèle'});await touchWeek(true);await loadAll();renderAll();toast('Semaine réinitialisée depuis la semaine modèle.')}
 async function recreateGuestCommands(){const key=weekKey(weekStart);const actions=[];currentGuests().forEach(g=>DAYS.forEach(d=>{const date=addDays(weekStart,d.offset);const closed=closureFor(date);actions.push(['AddRecord',TABLES.cmd,null,{SemaineKey:key,PersonKey:g.PersonKey,SourceType:g.TypePersonne,SourceId:g.id,Nom:g.Nom,Prenom:g.Prenom,Groupe:'Stagiaire / Visiteur',Regime:g.Regime,Texture:g.Texture,Jour:d.key,DateJour:gristDate(addDays(weekStart,d.offset)),Annee:weekStart.getFullYear(),TypeCommande:closed?'Fermé':(g[d.key]?'Repas sur place':'Absent'),HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:''}])}));if(actions.length)await grist.docApi.applyUserActions(actions)}
@@ -850,7 +866,6 @@ async function touchWeekByKey(key,markRectificative=false){const w=weeks.find(x=
 function unlockArchivedWeek(){if(!confirm('Cette semaine est archivée. Voulez-vous autoriser sa modification dans cette session ? Les changements seront tracés.'))return;archiveEditUnlocked=true;$('editor').classList.remove('locked');$('unlockArchive').hidden=true;toast('Modification de la semaine archivée autorisée pour cette session.')}
 
 function availableYears(){const current=new Date().getFullYear(),ys=new Set([weekStart.getFullYear()]);for(let y=current-5;y<=current+10;y++)ys.add(y);weeks.forEach(w=>ys.add(weekYearOf(w)));return[...ys].filter(Number.isFinite).sort((a,b)=>b-a)}
-function storedYears(){const ys=new Set();weeks.forEach(w=>ys.add(weekYearOf(w)));return[...ys].filter(Number.isFinite).sort((a,b)=>b-a)}
 function weekYearOf(w){return +w?.Annee||parseKey(w?.SemaineKey).getFullYear()}
 async function openYear(year){const candidates=weeks.filter(w=>weekYearOf(w)===year).sort((a,b)=>a.SemaineKey.localeCompare(b.SemaineKey));if(candidates.length){const currentMonth=weekStart.getMonth();const nearest=candidates.reduce((best,w)=>Math.abs(parseKey(w.SemaineKey).getMonth()-currentMonth)<Math.abs(parseKey(best.SemaineKey).getMonth()-currentMonth)?w:best,candidates[0]);return openWeek(nearest.SemaineKey)}const d=mondayOf(new Date(year,0,4));return openWeek(weekKey(d))}
 function gristDate(d){if(!isValidDate(d))return null;return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/1000}
@@ -867,7 +882,6 @@ function cmpField(a,b,f){const v=x=>f==='name'?`${x.Nom||''} ${x.Prenom||''}`:f=
 function comparePeople(a,b){return String(a.Nom||'').localeCompare(String(b.Nom||''),'fr',{sensitivity:'base'})||String(a.Prenom||'').localeCompare(String(b.Prenom||''),'fr',{sensitivity:'base'})}
 function uniquePeople(rows){const m=new Map();rows.forEach(x=>{if(!m.has(x.PersonKey))m.set(x.PersonKey,x)});return[...m.values()]}
 function statusForPerson(p){if(p.Groupe==='Professionnel')return'Professionnel';if(p.Groupe==='Stagiaire / Visiteur')return guests.find(g=>g.PersonKey===p.PersonKey)?.TypePersonne||'Invité';return'Usager'}
-function orderCode(t){if(t==='Repas sur place')return'✓';if(t==='Plateau')return'P';if(t==='Container')return'C';if(t==='Pique-nique')return'PN';if(t==='Fermé')return'FERMÉ';return'–'}
 function statusClass(s){return norm(s).includes('rectific')?'rectificative':norm(s).includes('command')?'commandee':norm(s).includes('archiv')?'archivee':''}
 function norm(s){return String(s||'').trim().toLocaleLowerCase('fr-FR')}
 function dayIndex(k){return Math.max(0,DAYS.findIndex(d=>d.key===k))}
@@ -880,6 +894,5 @@ function emailWeekText(d){return `semaine du ${frDate(d)} au ${frDate(addDays(d,
 function weekShort(d){return `${dayMonth(d)} → ${dayMonth(addDays(d,4))}`}
 function frDate(d){return new Intl.DateTimeFormat('fr-FR',{day:'numeric',month:'long',year:'numeric'}).format(d)}
 function dayMonth(d){return new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'2-digit'}).format(d)}
-function formatStamp(s){try{return new Intl.DateTimeFormat('fr-FR',{dateStyle:'short'}).format(new Date(s))}catch{return''}}
 function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(t._to);t._to=setTimeout(()=>t.hidden=true,3200)}

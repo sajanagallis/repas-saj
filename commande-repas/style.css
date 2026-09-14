@@ -23,17 +23,17 @@
 .history-year-label{min-width:150px}.history-year-label select{margin-top:4px}.history-row{grid-template-columns:1fr 90px 130px 130px}.history-head{display:grid;grid-template-columns:1fr 90px 130px 130px;gap:8px;padding:6px 9px;font-size:11px;font-weight:700;color:#607586;border-bottom:2px solid var(--line)}
 
 /* Logo configurable */
-.screen-logo{height:46px;max-width:150px;object-fit:contain;margin-left:auto}.logo-settings{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center}.logo-preview-wrap{height:110px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fafcfd;padding:10px}.logo-preview{max-width:100%;max-height:90px;object-fit:contain}.logo-empty{font-size:12px;color:#718493;text-align:center}.logo-actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}.file-button{display:inline-flex;align-items:center;border:1px solid #9fb4c4;border-radius:7px;padding:7px 10px;background:#fff;cursor:pointer;font-size:13px}.file-button:hover{background:#f3f7fa}.logo-actions .hint{width:100%;margin:2px 0 0}.print-logo-wrap{width:44mm;min-height:18mm;display:flex;justify-content:flex-end;align-items:flex-start}.print-logo{max-width:44mm;max-height:18mm;object-fit:contain}.odyneo{font-size:14pt}.print-meta{font-size:6.5pt;color:#183b64;margin-top:1mm}
+.screen-logo{height:46px;max-width:150px;object-fit:contain;margin-left:auto}.logo-settings{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center}.logo-preview-wrap{height:110px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fafcfd;padding:10px}.logo-preview{max-width:100%;max-height:90px;object-fit:contain}.logo-empty{font-size:12px;color:#718493;text-align:center}.logo-actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}.file-button{display:inline-flex;align-items:center;border:1px solid #9fb4c4;border-radius:7px;padding:7px 10px;background:#fff;cursor:pointer;font-size:13px}.file-button:hover{background:#f3f7fa}.logo-actions .hint{width:100%;margin:2px 0 0}.print-logo-wrap{width:44mm;min-height:18mm;display:flex;justify-content:flex-end;align-items:flex-start}.print-logo{max-width:44mm;max-height:18mm;object-fit:contain}.print-meta{font-size:6.5pt;color:#183b64;margin-top:1mm}
 @media(max-width:800px){.logo-settings{grid-template-columns:1fr}.screen-logo{display:none!important}}
 
-/* V4 — contrôle, suivi et traçabilité */
+/* Interface consolidée */
 .dashboard{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:8px;margin:12px 0 6px}.dash-card{border:1px solid var(--line);border-radius:9px;padding:9px;background:#f9fbfc}.dash-card b{display:block;font-size:18px;color:var(--navy);margin-top:3px}.dash-card small{color:var(--muted)}.dash-card.warn{background:#fff6df;border-color:#eed39a}.dash-card.good{background:#edf8f0;border-color:#b9ddc1}.dash-card.alert{background:#fdecec;border-color:#edb2b2}.safety-actions{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.week-link.alert-due{border-color:#d98c8c;background:#fff0f0}.week-link.alert-soon{border-color:#e4c884;background:#fff9e8}.week-link.rectificative{box-shadow:inset 3px 0 #d47a00}.order-line{display:flex;align-items:center;gap:4px}.order-line .order-select{flex:1}.propagate{padding:3px 6px;line-height:1}.note-input{min-width:120px;padding:4px;margin:0;font-size:11px}.audit-panel{margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#fbfcfd}.audit-panel summary{cursor:pointer;padding:9px 11px;font-weight:700;color:var(--navy)}.audit-row{display:grid;grid-template-columns:120px 120px 100px 1fr;gap:8px;padding:7px 10px;border-top:1px solid var(--line);font-size:11px}.audit-row .audit-detail{text-align:left}.audit-empty{padding:10px;color:var(--muted);font-size:12px}.validation-ok{padding:10px;border-radius:7px;background:#edf8f0;color:#2f6d40;font-weight:700}.validation-errors{margin:0;padding-left:20px}.validation-errors li{margin:6px 0}.editor.locked{opacity:.7;pointer-events:none}.rectificative-banner{background:#fff0cf;border:1px solid #e4b85c;color:#7a4c00;font-weight:800;text-align:center;padding:1.5mm;margin:1.5mm 0;border-radius:3px}.person-note-print{font-size:6pt;color:#5c6872;font-weight:400;display:block;white-space:normal;margin-top:.4mm}.state-line{font-size:11px;color:#607586;margin-top:4px}.status.rectificative{background:#fff0cf;color:#875600}.status.a-verifier{background:#fde3e3;color:#8a2323}
 @media(max-width:1100px){.dashboard{grid-template-columns:repeat(2,1fr)}}
 
-.save-week-btn{font-weight:800;border-color:#4f8a62;background:#f5fbf7;color:#28613a}.save-week-btn:hover{background:#eaf7ee}.save-week-btn.saving{opacity:.65;pointer-events:none}.save-week-ok{display:inline-flex;align-items:center;gap:5px;align-self:center;color:#238443;font-size:12px;font-weight:800;white-space:nowrap}.save-week-ok[hidden]{display:none}.save-week-ok::first-letter{font-size:16px}
+.save-week-btn{font-weight:800;border-color:#4f8a62;background:#f5fbf7;color:#28613a}.save-week-btn:hover{background:#eaf7ee}.save-week-btn.saving{opacity:.65;pointer-events:none}
 
 
-/* V6 — semaine modèle */
+/* Interface consolidée */
 .template-settings{overflow-x:auto}
 .template-table{min-width:1180px}
 .template-table .day-cell{min-width:150px;vertical-align:top}
@@ -41,7 +41,7 @@
 .template-table .extra-row{margin-top:5px;display:flex;gap:4px;flex-wrap:wrap}
 .template-table .extra-row input,.template-table .extra-row select{max-width:130px}
 
-/* V7 — saisie directe de la semaine habituelle */
+/* Interface consolidée */
 .model-page{padding:18px}.model-title{align-items:flex-start}.model-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:720px}.model-info{margin:10px 0;padding:10px 12px;border:1px solid #c9d9e4;border-radius:8px;background:#f5f9fb;color:#34516a;font-size:12px}.model-meta{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 12px;padding:8px 10px;background:#fbfcfd;border:1px solid var(--line);border-radius:7px;font-size:12px;color:#536b7d}.model-meta b{color:var(--navy)}
 #tab-modele .template-settings{max-width:100%;overflow:auto;border:1px solid var(--line);border-radius:8px}
 #tab-modele .template-table{margin:0;min-width:1400px}
@@ -122,7 +122,7 @@
   #emailBtn{background:#7445d4;border-color:#7445d4;color:#fff}
   #emailBtn::before{content:'✉';font-size:17px;margin-right:6px}
   #resetWeek{background:#fff;border-color:#d6e0e8;color:#627688;font-weight:600}
-  .save-week-ok{background:#e9f8ef;border:1px solid #b6e0c4;border-radius:20px;padding:7px 10px}
+  
 
   .dashboard{grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin:0 0 10px}
   .dash-card{min-height:84px;border:0;border-radius:10px;padding:12px 14px 10px 78px;position:relative;display:flex;flex-direction:column;justify-content:center;box-shadow:inset 0 0 0 1px #d6e6f0}
@@ -157,8 +157,8 @@
   .editor-group{margin:0;border:1px solid #cbdfe9;border-radius:9px;background:#fff;box-shadow:0 1px 2px #244b6810}
   .group-title{min-height:43px;padding:9px 16px 8px 48px;font-size:21px;align-items:center;position:relative}
   .group-title::before{position:absolute;left:18px;font-size:23px;line-height:1}
-  .g-rdc .group-title{background:var(--rdc)}.g-rdc .group-title::before{content:'🍴'}
-  .g-floor .group-title{background:var(--floor)}.g-floor .group-title::before{content:'🍴'}
+  .g-rdc .group-title::before{content:'🍴'}
+  .g-floor .group-title::before{content:'🍴'}
   .g-pro .group-title{background:var(--pro);color:#35118c}.g-pro .group-title::before{content:'👥'}
   .g-guest .group-title{background:linear-gradient(90deg,#ffc4df,#ffdbeb)}.g-guest .group-title::before{content:'👤'}
   .group-title span:last-child{font-size:15px;color:inherit}
@@ -208,21 +208,21 @@
   }
 }
 
-/* V9 — absence volontairement neutre : 'Absent' reste sur fond blanc dans les menus déroulants. */
+/* Interface consolidée */
 .day-cell.meal-absent{background:#fff!important}
 .meal-absent .order-select{background:#fff!important;color:#17324a!important;border-color:#b9cfe0!important}
 .order-select option{background:#fff;color:#17324a}
 
-/* V10: pas de tuiles de synthèse sur l’écran principal */
+/* Interface consolidée */
 #dashboard,.dashboard{display:none!important}
 /* Menus de la semaine habituelle : lisibles et visibles sur fond blanc */
 #tab-modele .order-select{background:#fff!important;color:#17324a!important;border:1px solid #b9c9d7!important;border-radius:7px!important;padding:7px 28px 7px 9px!important;min-height:34px!important}
 #tab-modele .day-cell{background:#fff!important}
 #tab-modele .template-table td{background:#fff}
 /* Confirmation d’enregistrement */
-.save-week-ok{background:#edf8f0;border:1px solid #b9ddc1;border-radius:999px;padding:6px 10px;color:#238443!important}
 
-/* V11 — cohérence stricte écran/print et semaine habituelle. */
+
+/* Interface consolidée */
 .template-table tr.template-rdc td.sticky-group{background:var(--rdc);font-weight:700}
 .template-table tr.template-floor td.sticky-group{background:var(--floor);font-weight:700}
 .template-table tr.template-pro td.sticky-group{background:var(--pro);font-weight:700;color:#35118c}
@@ -231,7 +231,7 @@
 .template-table .day-cell{background:#fff}
 
 
-/* V12 — ajustements du 14/09/2026 */
+/* Interface consolidée */
 #futureWeeks{min-width:260px;min-height:52px;padding:9px 16px!important;white-space:normal!important;line-height:1.2!important;display:flex;align-items:center;justify-content:center;text-align:center}
 /* Container : gris dans tous les menus de sélection à l'écran. */
 .meal-container .order-select,
@@ -260,15 +260,15 @@
 .list-controls select{margin-top:4px;height:36px;background:#fff}
 .template-controls{position:sticky;left:0;z-index:5;max-width:760px}
 
-/* V13 — édition directe groupe/régime/texture */
+/* Interface consolidée */
 .inline-profile-select{min-width:120px;margin:0;padding:5px 7px;background:#fff}.settings-table td .inline-profile-select{width:100%}
 
-/* V14 — menus régime / texture modifiables directement pour chaque personne */
+/* Interface consolidée */
 .editable-profile{min-width:132px}
 .screen-profile-select{width:100%;min-width:120px;padding:6px 28px 6px 9px;border:1px solid #cbd8e8;border-radius:7px;background:#fff;color:#17345f;font-weight:600}
 .screen-profile-select:focus{outline:2px solid rgba(34,112,180,.18);border-color:#77a9d8}
 
-/* V15 — alignements sélection de semaine / statut (14-09-2026) */
+/* Interface consolidée */
 @media (min-width:1001px){
   /* La zone de navigation dispose désormais de sa vraie largeur : plus de chevauchement avec Année. */
   .sidebar{
@@ -308,8 +308,7 @@
 }
 
 
-/* V16 — 14/09/2026 : alignements, gestion directe des personnes,
-   semaine habituelle regroupée comme la commande. */
+/* Interface consolidée */
 
 /* Les deux boutons de contrôle ont exactement la même hauteur et le même alignement. */
 .safety-actions{
@@ -633,10 +632,7 @@
 }
 
 
-/* V19 — simplification de l'écran Commande repas (14/09/2026)
-   - suppression du bouton de création automatique des 8 semaines
-   - suppression du bloc global "Tri du détail"
-   - alignement du bouton Outlook sur la rangée des actions */
+/* Interface consolidée */
 
 /* Le bouton Outlook doit rester entièrement sur une seule ligne et centré verticalement. */
 #emailBtn{
@@ -816,7 +812,7 @@
 }
 
 
-/* V22.1 — séparation Nom-Prénom / Régime + couleurs texture renforcées */
+/* Interface consolidée */
 @media screen {
   /* Séparation verticale franche entre identité et profil alimentaire. */
   #tab-commande .editor-group th:first-child,
@@ -840,7 +836,7 @@
     background:#63c77f!important;
     border:2px solid #2f934a!important;
     color:#103b1d!important;
-    font-weight:800!important;
+    font-weight:400!important;
   }
   select.profile-red,
   #tab-commande select.profile-red,
@@ -849,6 +845,15 @@
     background:#ef7f7f!important;
     border:2px solid #c93e3e!important;
     color:#651717!important;
-    font-weight:800!important;
+    font-weight:400!important;
   }
+}
+
+
+/* Interface consolidée */
+select.profile-green, select.profile-red,
+#tab-commande select.profile-green, #tab-commande select.profile-red,
+#tab-modele select.profile-green, #tab-modele select.profile-red,
+.settings-table select.profile-green, .settings-table select.profile-red{
+  font-weight:400!important;
 }
