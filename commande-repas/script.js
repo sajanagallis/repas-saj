@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V24 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V26 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -609,7 +609,7 @@ async function createTemplateType(e){
   await loadAll();renderTemplateEditor();
 }
 function templateExtrasHtml(r){if(!['Plateau','Container','Pique-nique'].includes(r.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-template-time="${r.id}" value="${esc(r.HeureRetrait||'')}">`;if(r.TypeCommande==='Pique-nique')s+=`<select data-template-bread="${r.id}"><option ${r.Pain==='Pain'?'selected':''}>Pain</option><option ${r.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-template-picnic="${r.id}"><option value="" ${!r.OptionPique?'selected':''}>Standard</option><option ${r.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${r.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
-async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();toast('Semaine habituelle enregistrée. Les semaines déjà créées ne sont pas modifiées.');}
+async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();toast('Semaine habituelle mise à jour. Cliquez sur « Enregistrer la semaine habituelle » pour l’appliquer à la commande affichée.');}
 async function saveTemplateExtra(e){const id=+(e.target.dataset.templateTime||e.target.dataset.templateBread||e.target.dataset.templatePicnic);const field=e.target.dataset.templateTime?'HeureRetrait':e.target.dataset.templateBread?'Pain':'OptionPique';await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,{[field]:e.target.value}]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateMeta();toast('Semaine habituelle enregistrée.');}
 
 function renderTemplateMeta(){
@@ -620,13 +620,102 @@ function renderTemplateMeta(){
   const lastText=last?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date(last)):'jamais';
   el.innerHTML=`<span><b>${people.length}</b> personne${people.length>1?'s':''} active${people.length>1?'s':''}</span><span><b>${mealCount}</b> repas habituels sur la semaine</span><span>Dernier enregistrement : <b>${esc(lastText)}</b></span>`;
 }
+async function flushVisibleTemplateSelections(){
+  const actions=[];
+  const seen=new Set();
+  document.querySelectorAll('#templateSettings select[data-template-id]').forEach(sel=>{
+    const id=+sel.dataset.templateId;
+    const row=templateRows.find(x=>+x.id===id);
+    if(!row)return;
+    seen.add(`${row.PersonKey}|${row.Jour}`);
+    const type=sel.value;
+    const fields={
+      TypeCommande:type,
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',
+      Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',
+      OptionPique:type==='Pique-nique'?(row.OptionPique||''):''
+    };
+    const same=templateRows.filter(x=>x.PersonKey===row.PersonKey&&x.Jour===row.Jour);
+    (same.length?same:[row]).forEach(r=>actions.push(['UpdateRecord',TABLES.template,r.id,fields]));
+  });
+  document.querySelectorAll('#templateSettings select[data-template-new]').forEach(sel=>{
+    const personKey=sel.dataset.personKey,day=sel.dataset.templateDay;
+    if(!personKey||!day)return;
+    const composite=`${personKey}|${day}`;
+    if(seen.has(composite))return;
+    actions.push(['AddRecord',TABLES.template,null,{PersonKey:personKey,Jour:day,TypeCommande:sel.value,HeureRetrait:'',Pain:sel.value==='Pique-nique'?'Pain':'',OptionPique:'',NoteCuisine:''}]);
+    seen.add(composite);
+  });
+  if(actions.length)await grist.docApi.applyUserActions(actions);
+  return actions.length;
+}
+
+async function applyTemplateToSelectedWeek(){
+  const key=weekKey(weekStart);
+  let w=weeks.find(x=>x.SemaineKey===key);
+  if(!w){await ensureWeek(weekStart);await loadAll();w=weeks.find(x=>x.SemaineKey===key)}
+  if(!w)return {updated:0,added:0,removedDuplicates:0,skipped:'missing'};
+  if(isWeekArchived(w))return {updated:0,added:0,removedDuplicates:0,skipped:'archived'};
+  if(effectiveWeekStatus(w)==='Commandée')return {updated:0,added:0,removedDuplicates:0,skipped:'ordered'};
+
+  const monday=parseKey(key);
+  const people=activePeopleForWeek(monday);
+  const actions=[];
+  let updated=0,added=0,removedDuplicates=0;
+  for(const person of people){
+    for(const d of DAYS){
+      const date=addDays(monday,d.offset);
+      const closed=closureFor(date);
+      const desired=templateCommandRecord(person,key,d.key);
+      if(closed){desired.TypeCommande='Fermé';desired.HeureRetrait='';desired.Pain='';desired.OptionPique=''}
+      const matches=commands
+        .filter(c=>c.SemaineKey===key&&c.PersonKey===person.PersonKey&&c.Jour===d.key)
+        .sort((a,b)=>(+b.id||0)-(+a.id||0));
+      const fields={
+        SourceType:desired.SourceType,SourceId:desired.SourceId,Nom:desired.Nom,Prenom:desired.Prenom,
+        Groupe:desired.Groupe,Regime:desired.Regime,Texture:desired.Texture,DateJour:desired.DateJour,Annee:desired.Annee,
+        TypeCommande:desired.TypeCommande,HeureRetrait:desired.HeureRetrait||'',Pain:desired.Pain||'',OptionPique:desired.OptionPique||'',NoteCuisine:desired.NoteCuisine||''
+      };
+      if(matches.length){
+        actions.push(['UpdateRecord',TABLES.cmd,matches[0].id,fields]);updated++;
+        for(const duplicate of matches.slice(1)){actions.push(['RemoveRecord',TABLES.cmd,duplicate.id]);removedDuplicates++;}
+      }else{
+        actions.push(['AddRecord',TABLES.cmd,null,desired]);added++;
+      }
+    }
+  }
+  if(actions.length)await grist.docApi.applyUserActions(actions);
+  if(actions.length){
+    const now=new Date();
+    await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false}]]);
+    await logAudit({week:key,action:'Application semaine habituelle',detail:`Semaine habituelle appliquée à la commande : ${updated} mise(s) à jour, ${added} ajout(s), ${removedDuplicates} doublon(s) supprimé(s)`});
+  }
+  return {updated,added,removedDuplicates,skipped:null};
+}
+
 async function saveTemplateExplicitly(){
   const btn=$('saveTemplateBtn');if(!btn)return;
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
+    // 1) Enregistrer réellement toutes les valeurs visibles de la semaine habituelle.
+    await flushVisibleTemplateSelections();
     await saveSetting('templateLastSaved',new Date().toISOString());
-    await loadAll();renderTemplateMeta();toast('Semaine habituelle enregistrée.');
-  }finally{btn.disabled=false;btn.textContent='Enregistrer la semaine habituelle';}
+    await loadAll();
+
+    // 2) Appliquer explicitement la semaine habituelle à la commande actuellement affichée.
+    // Les semaines historiques et les semaines déjà commandées ne sont jamais écrasées.
+    const sync=await applyTemplateToSelectedWeek();
+    await loadAll();
+    renderAll();
+    if(sync.skipped==='ordered')toast('Semaine habituelle enregistrée. La commande affichée est déjà « Commandée » et n’a pas été écrasée.');
+    else if(sync.skipped==='archived')toast('Semaine habituelle enregistrée. Une semaine archivée ne peut pas être modifiée.');
+    else toast('Semaine habituelle enregistrée et appliquée à la commande affichée.');
+  }catch(err){
+    console.error('Enregistrement semaine habituelle',err);
+    toast('Erreur pendant l’enregistrement de la semaine habituelle : '+(err.message||err));
+  }finally{
+    btn.disabled=false;btn.textContent='Enregistrer la semaine habituelle';
+  }
 }
 
 function renderLogo(){
