@@ -685,3 +685,132 @@
     column-gap:14px!important;
   }
 }
+
+/* =====================================================================
+   V20 — 14/09/2026
+   Lisibilité Régime / Texture, couleurs des textures et bandeaux complets.
+   Ces règles concernent uniquement l'écran : le print existant reste intact.
+   ===================================================================== */
+@media screen {
+  /* 1) Séparer nettement le profil alimentaire (Régime/Texture) des jours. */
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(3){
+    background:#f3f6f8!important;
+  }
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(3){
+    background:#fbfcfd;
+  }
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(3){
+    border-right:3px solid #8faabd!important;
+  }
+  #tab-commande .editor-group th:nth-child(4),
+  #tab-modele .template-editor-group th:nth-child(4){
+    border-left:3px solid #8faabd!important;
+  }
+
+  /* Largeurs fixes : les menus ne débordent plus et les libellés restent complets. */
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(2){
+    width:185px!important;min-width:185px!important;max-width:185px!important;
+  }
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(3){
+    width:175px!important;min-width:175px!important;max-width:175px!important;
+  }
+  #tab-commande .screen-profile-select,
+  #tab-modele .screen-profile-select,
+  .settings-table .inline-profile-select{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+
+  /* 2) Couleurs de fond exactement selon le régime / la texture. */
+  .profile-normal{
+    background:#e6e9ed!important;
+    border-color:#b9c0c8!important;
+    color:#374151!important;
+  }
+  .profile-brown{
+    background:#d8b79f!important;
+    border-color:#a97855!important;
+    color:#55331f!important;
+  }
+  .profile-purple{
+    background:#d5c1f4!important;
+    border-color:#9471d6!important;
+    color:#4f337e!important;
+  }
+  .profile-yellow{
+    background:#fff0a8!important;
+    border-color:#dcc253!important;
+    color:#685607!important;
+  }
+  /* Purée lisse : volontairement plus foncé que le vert "Repas sur place" du RDC. */
+  .profile-green{
+    background:#7fd596!important;
+    border-color:#3da85b!important;
+    color:#143f22!important;
+    font-weight:700!important;
+  }
+  /* Haché lubrifié : fond rouge franc, texte sombre lisible. */
+  .profile-red{
+    background:#ef9a9a!important;
+    border-color:#cf5656!important;
+    color:#701f1f!important;
+    font-weight:700!important;
+  }
+
+  /* 3) Les bandeaux RDC / 1er étage / Professionnels remplissent TOUTE la largeur visible. */
+  #tab-commande .editor-group,
+  #tab-modele .template-editor-group{
+    position:relative;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+  }
+  #tab-commande .editor-group .group-title,
+  #tab-modele .template-editor-group .group-title{
+    width:100%!important;
+    min-width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    margin:0!important;
+    border-radius:0!important;
+  }
+  /* Quand le tableau est plus large que la fenêtre, le bandeau garde aussi la largeur utile du tableau. */
+  #tab-commande .editor-group table,
+  #tab-modele .template-editor-group table{
+    min-width:1510px!important;
+  }
+  @supports (width:max(100%,1510px)) {
+    #tab-commande .editor-group .group-title,
+    #tab-modele .template-editor-group .group-title{
+      width:max(100%,1510px)!important;
+    }
+  }
+
+  /* 4) La colonne Note cuisine ne doit jamais réapparaître dans les tableaux écran. */
+  #tab-commande th.note-col,
+  #tab-commande td.note-col,
+  #tab-modele th.note-col,
+  #tab-modele td.note-col,
+  #tab-commande .note-input,
+  #tab-modele .note-input{
+    display:none!important;
+  }
+}
