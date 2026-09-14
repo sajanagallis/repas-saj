@@ -6,116 +6,220 @@
   <title>Commande repas — SAJ Anagallis</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <!-- Utilisés uniquement pour créer le PDF joint au brouillon Outlook. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <header class="app-header no-print">
-    <div class="brand-block">
-      <div class="brand-mark" aria-hidden="true">✣</div>
-      <div>
-        <div class="brand-title">SAJ Anagallis</div>
-        <div class="brand-subtitle">Les Tourrais - Craponne</div>
-      </div>
+  <header class="topbar no-print">
+    <div class="brand">
+      <div class="brand-symbol" aria-hidden="true">✣</div>
+      <div><h1>SAJ Anagallis</h1><div class="brand-small">Les Tourrais · Craponne</div></div>
     </div>
-
-    <div class="page-title-block">
-      <div class="title-icon" aria-hidden="true">🍴</div>
-      <div>
-        <h1>Commande repas</h1>
-        <p>Bien manger aujourd'hui, avec vous !</p>
-      </div>
-    </div>
-
-    <nav class="top-tabs" aria-label="Navigation du widget">
-      <button class="top-tab active" type="button" data-view="commande"><span class="tab-icon">♨</span><span>Commande repas</span></button>
-      <button class="top-tab" type="button" data-view="habituelle"><span class="tab-icon">▦</span><span>Semaine habituelle</span></button>
-      <button class="top-tab" type="button" data-view="historique"><span class="tab-icon">◴</span><span>Historique</span></button>
-      <button class="top-tab" type="button" data-view="parametres"><span class="tab-icon">⚙</span><span>Paramètres</span></button>
-      <button class="top-tab" type="button" data-view="aide"><span class="tab-icon">?</span><span>Aide</span></button>
+    <div class="app-title-block"><span class="meal-icon" aria-hidden="true">🍴</span><div><strong>Commande repas</strong><small>Préparer et vérifier la commande de la semaine</small></div></div>
+    <nav class="tabs" aria-label="Navigation">
+      <button class="tab active" data-tab="commande"><span class="tab-ico">▣</span>Commande repas</button>
+      <button class="tab" data-tab="modele"><span class="tab-ico">▦</span>Semaine habituelle</button>
+      <button class="tab" data-tab="historique"><span class="tab-ico">↶</span>Historique</button>
+      <button class="tab" data-tab="parametres"><span class="tab-ico">⚙</span>Paramètres</button>
+      <button class="tab" data-tab="aide"><span class="tab-ico">?</span>Aide</button>
     </nav>
-
-    <div class="header-logo-wrap" title="Déposez votre logo sous le nom logo.png dans le même dossier GitHub">
-      <img id="headerLogo" src="logo.png" alt="Logo" onerror="this.classList.add('logo-missing')">
-      <span class="logo-fallback">LOGO</span>
-    </div>
+    <img id="screenLogo" class="screen-logo" alt="Logo de l'association" hidden>
   </header>
 
-  <main class="app-main">
-    <section class="control-panel no-print">
-      <div class="week-picker-block">
-        <div class="panel-label">Sélection de la semaine</div>
-        <div class="week-picker">
-          <button id="prevWeek" class="arrow-btn" type="button" aria-label="Semaine précédente">‹</button>
-          <div class="week-display">
-            <strong id="weekRange">—</strong>
-            <span id="weekNumber">—</span>
+  <main class="app no-print">
+    <section id="tab-commande" class="tab-panel active">
+      <div class="workspace">
+        <aside class="sidebar">
+          <h2>Sélection de la semaine</h2>
+          <div class="nav-row"><button id="prevWeek">‹</button><button id="thisWeek">Cette semaine</button><button id="nextWeek">›</button></div>
+          <label>Année <select id="weekYear"></select></label>
+          <label>Semaine <input type="date" id="weekPicker"></label>
+          <button id="futureWeeks" class="secondary full">Créer / vérifier les 8 semaines à venir</button>
+          <h3>Semaines enregistrées</h3>
+          <div id="weekList" class="week-list"></div>
+        </aside>
+
+        <section class="content">
+          <div class="week-head">
+            <div><span class="eyebrow">SEMAINE SÉLECTIONNÉE</span><h2 id="weekTitle">—</h2><div id="closureBanner" class="closure-banner" hidden></div></div>
+            <div class="head-actions">
+              <label>Statut <select id="weekStatus"><option>À préparer</option><option>Commandée</option><option>Archivée</option></select></label>
+              <button id="saveWeekBtn" class="save-week-btn" type="button">Enregistrer</button><span id="saveWeekOk" class="save-week-ok" aria-live="polite" hidden>✓ Enregistré</span>
+              <button id="resetWeek">Réinitialiser depuis la semaine modèle</button>
+              <button id="printBtn">Imprimer</button>
+              <button id="pdfBtn">Créer le PDF</button>
+              <button id="emailBtn" class="primary">Préparer l'e-mail Outlook</button>
+            </div>
           </div>
-          <button id="nextWeek" class="arrow-btn" type="button" aria-label="Semaine suivante">›</button>
+
+          <div id="dashboard" class="dashboard"></div>
+          <div class="safety-actions">
+            <button id="checkOrder" class="primary">Vérifier la commande</button>
+            <button id="absenceBtn">Absence exceptionnelle</button>
+            <button id="unlockArchive" class="danger" hidden>Modifier cette semaine archivée</button>
+          </div>
+
+          <div class="sortbar">
+            <strong>Tri du détail :</strong>
+            <label>1. <select id="sortPrimary"><option value="name">Nom</option><option value="diet">Régime</option><option value="texture">Texture</option><option value="group">Lieu</option></select></label>
+            <label>2. <select id="sortSecondary"><option value="name">Nom</option><option value="diet">Régime</option><option value="texture">Texture</option><option value="group">Lieu</option></select></label>
+            <label><select id="sortDirection"><option value="asc">A → Z</option><option value="desc">Z → A</option></select></label>
+          </div>
+
+          <div id="editor"></div>
+          <div class="week-notes"><label>Commentaires pour la cuisine<textarea id="weekComment" rows="3" placeholder="Commentaire facultatif"></textarea></label><div id="saveState" class="save-state">—</div></div>
+          <details class="audit-panel"><summary>Historique des modifications de cette semaine</summary><div id="auditList"></div></details>
+        </section>
+      </div>
+    </section>
+
+
+    <section id="tab-modele" class="tab-panel">
+      <section class="panel-card model-page">
+        <div class="panel-title model-title">
+          <div>
+            <span class="eyebrow">BASE DE PRÉ-REMPLISSAGE</span>
+            <h2>Semaine habituelle</h2>
+            <p>Remplissez directement ici la semaine type. Toute nouvelle semaine sera créée à partir de cette base puis restera indépendante.</p>
+          </div>
+          <div class="model-actions">
+            <button id="templateFromPresence" type="button">Initialiser depuis les présences habituelles</button>
+            <button id="templateFromCurrent" type="button">Copier la semaine sélectionnée</button>
+            <button id="saveTemplateBtn" class="save-week-btn" type="button">Enregistrer la semaine habituelle</button>
+            <span id="saveTemplateOk" class="save-week-ok" aria-live="polite" hidden>✓ Enregistré</span>
+          </div>
         </div>
-      </div>
+        <div class="model-info">
+          <b>Important :</b> les changements effectués ici ne modifient jamais les semaines déjà créées. Ils servent uniquement de base aux nouvelles semaines ou à une réinitialisation volontaire.
+        </div>
+        <div id="templateMeta" class="model-meta"></div>
+        <div id="templateSettings" class="template-settings"></div>
+      </section>
+    </section>
 
-      <div class="field-block">
-        <label for="yearSelect">Année</label>
-        <select id="yearSelect"></select>
-      </div>
+    <section id="tab-historique" class="tab-panel"><div class="panel-card"><div class="panel-title"><div><h2>Historique des commandes</h2><p>Cliquer sur une semaine pour l'ouvrir dans le widget.</p></div><label class="history-year-label">Année <select id="historyYear"></select></label></div><div id="historyList"></div></div></section>
 
-      <div class="field-block week-select-block">
-        <label for="weekSelect">Semaine</label>
-        <select id="weekSelect"></select>
-      </div>
-
-      <div class="field-block status-block">
-        <label for="statusSelect">Statut</label>
-        <select id="statusSelect">
-          <option>À préparer</option>
-          <option>Vérifiée</option>
-          <option>Commandée</option>
-          <option>Archivée</option>
-        </select>
-      </div>
-
-      <div class="action-block">
-        <button id="saveBtn" class="action-btn save-btn" type="button"><span>✓</span>Enregistrer</button>
-        <button id="printBtn" class="action-btn print-btn" type="button"><span>▣</span>Imprimer</button>
-        <button id="pdfBtn" class="action-btn pdf-btn" type="button"><span>PDF</span>Créer le PDF</button>
-        <button id="mailBtn" class="action-btn mail-btn" type="button"><span>✉</span>Préparer l'e-mail Outlook</button>
+    <section id="tab-parametres" class="tab-panel">
+      <div class="settings-grid">
+        <section class="panel-card">
+          <div class="panel-title"><h2>Personnes et présences habituelles</h2><button id="addPerson" class="primary">+ Ajouter une personne</button></div>
+          <p class="hint">Désactiver une personne conserve toutes les anciennes commandes. Les changements n'écrasent jamais une semaine déjà créée.</p>
+          <div id="peopleSettings"></div>
+        </section>
+        <section class="panel-card">
+          <h2>Vacances / fermetures</h2>
+          <form id="closureForm" class="inline-form">
+            <label>Du <input id="closureStart" type="date" required></label>
+            <label>Au <input id="closureEnd" type="date" required></label>
+            <label>Motif <input id="closureReason" value="Vacances" required></label>
+            <button class="primary" type="submit">Ajouter</button>
+          </form>
+          <div id="closureList"></div>
+        </section>
+        <section class="panel-card">
+          <h2>Logo de l'association</h2>
+          <div class="logo-settings">
+            <div class="logo-preview-wrap"><img id="logoPreview" class="logo-preview" alt="Aperçu du logo" hidden><div id="logoEmpty" class="logo-empty">Aucun logo enregistré</div></div>
+            <div class="logo-actions">
+              <label class="file-button">Choisir / modifier le logo<input id="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label>
+              <button id="removeLogo" class="danger" type="button">Supprimer le logo</button>
+              <p class="hint">PNG, JPEG, WebP ou SVG. Le logo est redimensionné automatiquement et enregistré dans les paramètres Grist.</p>
+            </div>
+          </div>
+        </section>
+        <section class="panel-card">
+          <h2>Outlook et traçabilité</h2>
+          <label>Nom utilisé dans l'historique des modifications <input id="auditUserSetting" type="text" placeholder="Ex. Prénom Nom"></label>
+          <label>Destinataire par défaut <input id="emailToSetting" type="email" placeholder="cuisine@exemple.fr"></label>
+          <label>Cc par défaut <input id="emailCcSetting" type="text" placeholder="facultatif"></label>
+          <label>Modèle du message <textarea id="emailTemplateSetting" rows="6"></textarea></label>
+          <label>URL Power Automate (facultative) <input id="powerAutomateUrl" type="url" placeholder="https://..."></label>
+          <p class="hint">Sans URL Power Automate, le widget télécharge le PDF puis ouvre Outlook avec l'adresse, l'objet et le message préremplis. Une pièce jointe automatique nécessite le flux Power Automate décrit dans POWER_AUTOMATE.md.</p>
+          <button id="saveEmailSettings" class="primary">Enregistrer les paramètres e-mail</button>
+        </section>
       </div>
     </section>
 
-    <section class="work-row no-print">
-      <button id="verifyBtn" class="verify-btn" type="button"><span>⌕</span>Vérifier la commande</button>
-      <button id="absenceBtn" class="absence-btn" type="button"><span>♟</span>Absence exceptionnelle</button>
-      <label class="comment-field">
-        <span>Commentaires pour la cuisine <small>(facultatif)</small></span>
-        <input id="kitchenComment" type="text" placeholder="Ajouter un commentaire…">
-      </label>
-    </section>
-
-    <div id="message" class="message no-print" hidden></div>
-
-    <section id="editor" class="editor-area"></section>
+    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine modèle :</b> chaque nouvelle semaine est créée à partir de la semaine modèle. Une fois créée, elle devient indépendante et peut être modifiée sans changer le modèle ni les autres semaines.</p><p><b>Semaines futures :</b> le widget crée automatiquement un horizon de 8 semaines à partir de cette semaine modèle.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
   </main>
 
-  <footer class="app-footer no-print">
-    <span>SAJ Anagallis - Les Tourrais - Craponne</span>
-    <span id="footerYear">Commande repas</span>
-  </footer>
+  <div id="toast" class="toast no-print" hidden></div>
 
-  <dialog id="absenceDialog">
-    <form id="absenceForm" method="dialog">
-      <h3>Absence exceptionnelle</h3>
-      <label>Personne
-        <select id="absencePerson" required></select>
-      </label>
-      <fieldset>
-        <legend>Jour(s) concerné(s)</legend>
-        <div id="absenceDays" class="day-checks"></div>
-      </fieldset>
-      <div class="dialog-actions">
-        <button value="cancel" type="button" class="secondary-btn" id="cancelAbsence">Annuler</button>
-        <button value="default" type="submit" class="primary-dialog-btn">Appliquer l'absence</button>
-      </div>
-    </form>
-  </dialog>
+  <!-- ZONE D'IMPRESSION : exactement 2 pages -->
+  <section id="printArea" aria-hidden="true">
+    <article id="printSummaryPage" class="print-page page-summary">
+      <header class="print-header"><div><div class="org">SAJ Anagallis <span>Les Tourrais · Craponne</span></div><h1>RÉCAPITULATIF DE LA COMMANDE REPAS</h1><h2 id="printWeek1">—</h2></div><div class="print-logo-wrap"><img id="printLogo1" class="print-logo" alt="Logo de l'association" hidden><div id="printLogoFallback1" class="odyneo">Odyneo</div></div></header>
+      <div id="summaryClosure" class="print-closure" hidden></div>
+      <div id="summaryContent"></div>
+      <footer>SAJ Anagallis – Les Tourrais – Craponne <span id="printStamp1"></span></footer>
+    </article>
+
+    <article id="printDetailPage" class="print-page page-detail">
+      <header class="print-header detail-title"><div><div class="org">SAJ Anagallis <span>Les Tourrais · Craponne</span></div><h1>DÉTAIL DE LA COMMANDE REPAS</h1><h2 id="printWeek2">—</h2></div><div class="print-logo-wrap"><img id="printLogo2" class="print-logo" alt="Logo de l'association" hidden><div id="printLogoFallback2" class="odyneo">Odyneo</div></div></header>
+      <div id="detailClosure" class="print-closure" hidden></div>
+      <div id="detailScale"><div id="detailContent"></div></div>
+      <footer>SAJ Anagallis – Les Tourrais – Craponne <span id="printStamp2"></span></footer>
+    </article>
+  </section>
+
+  <dialog id="personDialog"><form id="personForm" method="dialog">
+    <h3 id="personDialogTitle">Ajouter une personne</h3>
+    <input type="hidden" id="personConfigId">
+    <label>Source <select id="personSource"><option value="manual">Nouvelle personne</option><option value="user">Usager existant</option><option value="pro">Professionnel existant</option></select></label>
+    <label id="sourceSelectWrap" hidden>Personne <select id="sourcePerson"></select></label>
+    <div class="two"><label>Prénom <input id="personFirst"></label><label>Nom <input id="personLast"></label></div>
+    <label>Lieu / groupe <select id="personGroup"><option>RDC</option><option>1er étage</option><option>Professionnel</option></select></label>
+    <label>Régime <select id="personDiet"></select></label>
+    <label>Texture <select id="personTexture"></select></label>
+    <fieldset><legend>Présence habituelle</legend><div id="personDays" class="checks"></div></fieldset>
+    <div class="two"><label>Début <input id="personStart" type="date"></label><label>Fin <input id="personEnd" type="date"></label></div>
+    <label class="checkline"><input id="personActive" type="checkbox" checked> Personne active</label>
+    <div class="dialog-actions"><button value="cancel">Annuler</button><button id="savePerson" value="default" class="primary">Enregistrer</button></div>
+  </form></dialog>
+
+  <dialog id="guestDialog"><form id="guestForm" method="dialog">
+    <h3>Ajouter un stagiaire / visiteur</h3>
+    <div class="two"><label>Prénom <input id="guestFirst" required></label><label>Nom <input id="guestLast" required></label></div>
+    <label>Type <select id="guestType"><option>Stagiaire</option><option>Visiteur</option></select></label>
+    <label>Lieu <select id="guestFloor"><option>RDC</option><option>1er étage</option></select></label>
+    <label>Régime <select id="guestDiet"></select></label><label>Texture <select id="guestTexture"></select></label>
+    <fieldset><legend>Jours de présence</legend><div id="guestDays" class="checks"></div></fieldset>
+    <div class="dialog-actions"><button value="cancel">Annuler</button><button id="saveGuest" value="default" class="primary">Ajouter</button></div>
+  </form></dialog>
+
+  <dialog id="absenceDialog"><form id="absenceForm" method="dialog">
+    <h3>Absence exceptionnelle</h3>
+    <label>Personne <select id="absencePerson" required></select></label>
+    <div class="two"><label>Du <input id="absenceStart" type="date" required></label><label>Au <input id="absenceEnd" type="date" required></label></div>
+    <p class="hint">Les jours ouvrés de la période seront mis sur « Absent ». Les fermetures restent inchangées.</p>
+    <div class="dialog-actions"><button value="cancel">Annuler</button><button class="primary" value="default">Appliquer</button></div>
+  </form></dialog>
+
+  <dialog id="propagateDialog"><form id="propagateForm" method="dialog">
+    <h3>Appliquer aux semaines suivantes</h3>
+    <input id="propagateCommandId" type="hidden">
+    <p id="propagateSummary" class="hint"></p>
+    <label>Nombre de semaines <select id="propagateCount"><option value="1">1 semaine</option><option value="2">2 semaines</option><option value="3">3 semaines</option><option value="4">4 semaines</option><option value="6">6 semaines</option><option value="8">8 semaines</option></select></label>
+    <p class="hint">Seul le même jour de la semaine pour la même personne sera modifié. Les semaines archivées ne sont jamais changées.</p>
+    <div class="dialog-actions"><button value="cancel">Annuler</button><button class="primary" value="default">Appliquer</button></div>
+  </form></dialog>
+
+  <dialog id="validationDialog"><form method="dialog">
+    <h3>Contrôle de la commande</h3>
+    <div id="validationContent"></div>
+    <div class="dialog-actions"><button class="primary" value="default">Fermer</button></div>
+  </form></dialog>
+
+  <dialog id="emailDialog"><form id="emailForm" method="dialog">
+    <h3>Préparer l'e-mail Outlook</h3>
+    <label>À <input id="emailTo" type="email" required></label>
+    <label>Cc <input id="emailCc" type="text"></label>
+    <label>Objet <input id="emailSubject" type="text" required></label>
+    <label>Message <textarea id="emailBody" rows="8" required></textarea></label>
+    <label class="checkline"><input id="attachPdf" type="checkbox" checked> Joindre le PDF de la commande</label>
+    <div class="dialog-actions"><button value="cancel">Annuler</button><button id="createDraft" value="default" class="primary">Créer le brouillon Outlook</button></div>
+  </form></dialog>
 
   <script src="script.js"></script>
 </body>
