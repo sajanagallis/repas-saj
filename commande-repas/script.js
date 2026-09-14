@@ -451,8 +451,15 @@ async function applyV14KnownTextureCorrections(){
 
 function dietOptionsHtml(value){return DIETS.map(x=>`<option value="${esc(x)}" ${value===x?'selected':''}>${esc(x)}</option>`).join('')}
 function textureOptionsHtml(value){return TEXTURES.map(x=>`<option value="${esc(x)}" ${value===x?'selected':''}>${esc(x)}</option>`).join('')}
+function profileColorKey(value){
+  return String(value||'')
+    .trim()
+    .toLocaleLowerCase('fr-FR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'');
+}
 function profileValueClass(value,field){
-  const n=norm(value);
+  const n=profileColorKey(value);
   if(field==='Regime'){
     if(n==='normal')return'profile-normal';
     if(n==='sans viande'||n==='sans porc')return'profile-brown';
