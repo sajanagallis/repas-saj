@@ -476,6 +476,10 @@ function profileSelectHtml(p,field,isGuest=false){
 }
 async function saveScreenProfileField(e){
   const field=e.target.dataset.profileField,value=e.target.value,isGuest=e.target.dataset.profileGuest==='1';
+  // Retour visuel immédiat : la couleur suit la valeur sélectionnée sans attendre le rechargement Grist.
+  e.target.classList.remove('profile-normal','profile-brown','profile-purple','profile-yellow','profile-green','profile-red');
+  const liveClass=profileValueClass(value,field);
+  if(liveClass)e.target.classList.add(liveClass);
   if(isGuest){
     const id=+e.target.dataset.profileId; const g=guests.find(x=>+x.id===id); if(!g)return;
     const a=[['UpdateRecord',TABLES.guests,id,{[field]:value}]];
@@ -520,6 +524,9 @@ function renderSettings(){
 }
 async function saveInlineProfileField(e){
   const id=+e.target.dataset.profileId,field=e.target.dataset.profileField,value=e.target.value;
+  e.target.classList.remove('profile-normal','profile-brown','profile-purple','profile-yellow','profile-green','profile-red');
+  const liveClass=profileValueClass(value,field);
+  if(liveClass)e.target.classList.add(liveClass);
   const p=config.find(x=>+x.id===id);if(!p)return;
   const actions=[['UpdateRecord',TABLES.config,id,{[field]:value}]];
   // Met également à jour la semaine actuellement affichée pour éviter tout retour visuel à l'ancienne valeur.

@@ -814,3 +814,41 @@
     display:none!important;
   }
 }
+
+
+/* V22.1 — séparation Nom-Prénom / Régime + couleurs texture renforcées */
+@media screen {
+  /* Séparation verticale franche entre identité et profil alimentaire. */
+  #tab-commande .editor-group th:first-child,
+  #tab-commande .editor-group td:first-child,
+  #tab-modele .template-editor-group th:first-child,
+  #tab-modele .template-editor-group td:first-child{
+    border-right:4px solid #8faabd!important;
+  }
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(2){
+    border-left:4px solid #8faabd!important;
+  }
+
+  /* Les couleurs doivent rester visibles sur les SELECT, y compris après changement. */
+  select.profile-green,
+  #tab-commande select.profile-green,
+  #tab-modele select.profile-green,
+  .settings-table select.profile-green{
+    background:#63c77f!important;
+    border:2px solid #2f934a!important;
+    color:#103b1d!important;
+    font-weight:800!important;
+  }
+  select.profile-red,
+  #tab-commande select.profile-red,
+  #tab-modele select.profile-red,
+  .settings-table select.profile-red{
+    background:#ef7f7f!important;
+    border:2px solid #c93e3e!important;
+    color:#651717!important;
+    font-weight:800!important;
+  }
+}
