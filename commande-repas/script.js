@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V16 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V18 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -291,7 +291,6 @@ function renderEditor(){
   document.querySelectorAll('[data-bread-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-picnic-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-propagate-id]').forEach(x=>x.onclick=openPropagateDialog);
-  document.querySelectorAll('[data-note-person]').forEach(x=>x.onchange=savePersonNote);
   document.querySelectorAll('.screen-profile-select').forEach(x=>x.onchange=saveScreenProfileField);
   document.querySelectorAll('[data-remove-guest]').forEach(x=>x.onclick=removeGuest);
   document.querySelectorAll('[data-add-permanent-group]').forEach(x=>x.onclick=()=>openAddForGroup(x.dataset.addPermanentGroup));
@@ -313,7 +312,7 @@ function guestEditorGroup(gs,c){
   const sort=screenGroupSort['Stagiaire / Visiteur']||'name';
   return `<section class="editor-group g-guest"><div class="group-title"><span>STAGIAIRES / VISITEURS</span><span class="group-tools"><label>Trier par <select data-group-sort="Stagiaire / Visiteur"><option value="name" ${sort==='name'?'selected':''}>Nom</option><option value="diet" ${sort==='diet'?'selected':''}>Régime</option><option value="texture" ${sort==='texture'?'selected':''}>Texture</option></select></label></span></div>${editorTable(rows,c,true,sort)}</section>`
 }
-function editorTable(people,c,isGuest=false,sortField='name',managePermanent=false){return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine</th>${(isGuest||managePermanent)?'<th>Gestion</th>':''}</tr></thead><tbody>${sortPeopleSimple(people,sortField).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const note=rows.find(x=>x.NoteCuisine)?.NoteCuisine||'';const cfg=config.find(x=>x.PersonKey===p.PersonKey);return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',isGuest)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',isGuest)}</td>${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}<td><input class="note-input" data-note-person="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td>${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:managePermanent&&cfg?`<td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
+function editorTable(people,c,isGuest=false,sortField='name',managePermanent=false){return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}${(isGuest||managePermanent)?'<th>Gestion</th>':''}</tr></thead><tbody>${sortPeopleSimple(people,sortField).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const cfg=config.find(x=>x.PersonKey===p.PersonKey);return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',isGuest)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',isGuest)}</td>${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:managePermanent&&cfg?`<td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
 function editorDayCell(c){if(!c)return'<td>—</td>';const closed=c.TypeCommande==='Fermé';const mealClass='meal-'+norm(c.TypeCommande).replace(/[^a-z0-9]+/g,'-');return `<td class="day-cell ${closed?'closed-cell':''} ${mealClass}">${closed?'<b>FERMÉ</b>':`<div class="order-line"><select class="order-select" data-order-id="${c.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${c.TypeCommande===t?'selected':''}>${t}</option>`).join('')}</select><button class="mini propagate" type="button" title="Appliquer aux semaines suivantes" data-propagate-id="${c.id}">↪</button></div>${extrasHtml(c)}`}</td>`}
 function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-time-id="${c.id}" value="${esc(c.HeureRetrait||'')}">`;if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
 
@@ -450,11 +449,27 @@ async function applyV14KnownTextureCorrections(){
 
 function dietOptionsHtml(value){return DIETS.map(x=>`<option value="${esc(x)}" ${value===x?'selected':''}>${esc(x)}</option>`).join('')}
 function textureOptionsHtml(value){return TEXTURES.map(x=>`<option value="${esc(x)}" ${value===x?'selected':''}>${esc(x)}</option>`).join('')}
+function profileValueClass(value,field){
+  const n=norm(value);
+  if(field==='Regime'){
+    if(n==='normal')return'profile-normal';
+    if(n==='sans viande'||n==='sans porc')return'profile-brown';
+    if(n==='hypocalorique')return'profile-purple';
+    if(n==='hypolipidique')return'profile-yellow';
+  }else{
+    if(n==='normale')return'profile-normal';
+    if(n==='puree lisse')return'profile-green';
+    if(n==='hache lubrifie')return'profile-red';
+  }
+  return'';
+}
 function profileSelectHtml(p,field,isGuest=false){
-  const value=field==='Regime'?p.Regime:p.Texture;
+  const cfg=!isGuest?config.find(x=>x.PersonKey===p.PersonKey):null;
+  const source=cfg||p;
+  const value=field==='Regime'?(source.Regime||'Normal'):(source.Texture||'Normale');
   const opts=field==='Regime'?dietOptionsHtml(value):textureOptionsHtml(value);
-  const id=isGuest?(p.guest?.id||''):(config.find(x=>x.PersonKey===p.PersonKey)?.id||'');
-  const cls=field==='Regime'?'profile-diet-select':'profile-texture-select';
+  const id=isGuest?(p.guest?.id||''):(cfg?.id||'');
+  const cls=(field==='Regime'?'profile-diet-select':'profile-texture-select')+' '+profileValueClass(value,field);
   return `<select class="inline-profile-select screen-profile-select ${cls}" data-profile-id="${id}" data-profile-key="${esc(p.PersonKey)}" data-profile-field="${field}" data-profile-guest="${isGuest?'1':'0'}">${opts}</select>`;
 }
 async function saveScreenProfileField(e){
@@ -492,7 +507,7 @@ function renderSettings(){
   const groupOptions=v=>['RDC','1er étage','Professionnel'].map(x=>`<option value="${x}" ${v===x?'selected':''}>${x==='Professionnel'?'Professionnels':x}</option>`).join('');
   const dietOptions=v=>DIETS.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
   const textureOptions=v=>TEXTURES.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
-  $('peopleSettings').innerHTML=`<div class="list-controls"><label>Groupe <select id="settingsGroupFilter"><option value="all">Tous</option><option value="RDC" ${settingsGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${settingsGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${settingsGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Actif <select id="settingsActiveFilter"><option value="all">Tous</option><option value="active" ${settingsActiveFilter==='active'?'selected':''}>Actifs</option><option value="inactive" ${settingsActiveFilter==='inactive'?'selected':''}>Inactifs</option></select></label><label>Trier par <select id="settingsSort"><option value="name" ${settingsSort==='name'?'selected':''}>Nom</option><option value="group" ${settingsSort==='group'?'selected':''}>Groupe</option><option value="diet" ${settingsSort==='diet'?'selected':''}>Régime</option><option value="texture" ${settingsSort==='texture'?'selected':''}>Texture</option><option value="active" ${settingsSort==='active'?'selected':''}>Actif</option></select></label></div><table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Groupe">${groupOptions(p.Groupe)}</select></td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Regime">${dietOptions(p.Regime)}</select></td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Texture">${textureOptions(p.Texture)}</select></td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
+  $('peopleSettings').innerHTML=`<div class="list-controls"><label>Groupe <select id="settingsGroupFilter"><option value="all">Tous</option><option value="RDC" ${settingsGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${settingsGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${settingsGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Actif <select id="settingsActiveFilter"><option value="all">Tous</option><option value="active" ${settingsActiveFilter==='active'?'selected':''}>Actifs</option><option value="inactive" ${settingsActiveFilter==='inactive'?'selected':''}>Inactifs</option></select></label><label>Trier par <select id="settingsSort"><option value="name" ${settingsSort==='name'?'selected':''}>Nom</option><option value="group" ${settingsSort==='group'?'selected':''}>Groupe</option><option value="diet" ${settingsSort==='diet'?'selected':''}>Régime</option><option value="texture" ${settingsSort==='texture'?'selected':''}>Texture</option><option value="active" ${settingsSort==='active'?'selected':''}>Actif</option></select></label></div><table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Groupe">${groupOptions(p.Groupe)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Regime,'Regime')}" data-profile-id="${p.id}" data-profile-field="Regime">${dietOptions(p.Regime)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Texture,'Texture')}" data-profile-id="${p.id}" data-profile-field="Texture">${textureOptions(p.Texture)}</select></td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
   $('settingsGroupFilter').onchange=e=>{settingsGroupFilter=e.target.value;renderSettings()};
   $('settingsActiveFilter').onchange=e=>{settingsActiveFilter=e.target.value;renderSettings()};
   $('settingsSort').onchange=e=>{settingsSort=e.target.value;renderSettings()};
@@ -504,7 +519,12 @@ function renderSettings(){
 async function saveInlineProfileField(e){
   const id=+e.target.dataset.profileId,field=e.target.dataset.profileField,value=e.target.value;
   const p=config.find(x=>+x.id===id);if(!p)return;
-  await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,id,{[field]:value}]]);
+  const actions=[['UpdateRecord',TABLES.config,id,{[field]:value}]];
+  // Met également à jour la semaine actuellement affichée pour éviter tout retour visuel à l'ancienne valeur.
+  if(['Groupe','Regime','Texture'].includes(field)){
+    currentCommands().filter(x=>x.PersonKey===p.PersonKey).forEach(x=>actions.push(['UpdateRecord',TABLES.cmd,x.id,{[field]:value}]));
+  }
+  await grist.docApi.applyUserActions(actions);
   await loadAll();
   await syncConfigToFutureWeeks(p.PersonKey,{updateProfile:true});
   await loadAll();renderAll();toast(`${field==='Groupe'?'Groupe':field==='Regime'?'Régime':'Texture'} modifié(e).`);
@@ -521,9 +541,9 @@ function renderTemplateEditor(){
     const people=sortPeopleSimple(active.filter(p=>p.Groupe===group),sort);
     const addLabel=group==='Professionnel'?'+ Ajouter un professionnel':'+ Ajouter un usager';
     const body=people.length
-      ? `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine</th><th>Gestion</th></tr></thead><tbody>${people.map(p=>{
-          const rows=DAYS.map(d=>templateFor(p.PersonKey,d.key));const note=rows.find(r=>r?.NoteCuisine)?.NoteCuisine||'';
-          return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',false)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',false)}</td>${DAYS.map((d,i)=>templateDayCell(rows[i],p,d)).join('')}<td><input class="note-input" data-template-note="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td><td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td></tr>`
+      ? `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Gestion</th></tr></thead><tbody>${people.map(p=>{
+          const rows=DAYS.map(d=>templateFor(p.PersonKey,d.key));
+          return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',false)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',false)}</td>${DAYS.map((d,i)=>templateDayCell(rows[i],p,d)).join('')}<td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td></tr>`
         }).join('')}</tbody></table>`
       : '<div class="empty-group">Aucune personne dans ce groupe. Utilisez le bouton Ajouter.</div>';
     return `<section class="editor-group template-editor-group ${cls}"><div class="group-title"><span>${esc(title)}</span><span class="group-tools"><button class="group-add-btn" type="button" data-add-permanent-group="${esc(group)}">${addLabel}</button><label>Trier par <select data-template-group-sort="${esc(group)}"><option value="name" ${sort==='name'?'selected':''}>Nom</option><option value="diet" ${sort==='diet'?'selected':''}>Régime</option><option value="texture" ${sort==='texture'?'selected':''}>Texture</option></select></label><b>${people.length} personne${people.length>1?'s':''}</b></span></div>${body}</section>`;
@@ -535,7 +555,6 @@ function renderTemplateEditor(){
   document.querySelectorAll('[data-template-time]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-bread]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-picnic]').forEach(x=>x.onchange=saveTemplateExtra);
-  document.querySelectorAll('[data-template-note]').forEach(x=>x.onchange=saveTemplateNote);
   document.querySelectorAll('#templateSettings .screen-profile-select').forEach(x=>x.onchange=saveScreenProfileField);
   document.querySelectorAll('#templateSettings [data-add-permanent-group]').forEach(x=>x.onclick=()=>openAddForGroup(x.dataset.addPermanentGroup));
   document.querySelectorAll('#templateSettings [data-edit-permanent]').forEach(x=>x.onclick=()=>editPersonByKey(x.dataset.editPermanent));
@@ -654,14 +673,12 @@ function getSetting(key,fallback=''){return settings.find(x=>x.Cle===key)?.Valeu
 function bindUI(){
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   $('prevWeek').onclick=()=>changeWeek(-7);$('nextWeek').onclick=()=>changeWeek(7);$('thisWeek').onclick=()=>openWeek(weekKey(mondayOf(new Date())));$('weekPicker').onchange=()=>openWeek(weekKey(mondayOf(parseKey($('weekPicker').value))));$('weekYear').onchange=()=>openYear(+$('weekYear').value);$('historyYear').onchange=renderHistory;
-  $('futureWeeks').onclick=async()=>{const created=await ensureRollingWeeks(8);await loadAll();renderAll();toast(created?`${created} semaine(s) créée(s). Les semaines déjà existantes n’ont pas été modifiées.`:'Les 8 semaines à venir existent déjà. Aucune donnée n’a été modifiée.');};
   $('saveWeekBtn').onclick=saveCurrentWeekExplicitly;
   $('templateFromPresence').onclick=resetTemplateFromPresence;$('templateFromCurrent').onclick=copyCurrentWeekToTemplate;$('saveTemplateBtn').onclick=saveTemplateExplicitly;
   $('weekStatus').onchange=saveWeekStatus;$('weekComment').oninput=debounceSaveComment;$('resetWeek').onclick=resetWeekFromTemplate;
   $('checkOrder').onclick=showValidation;$('absenceBtn').onclick=openAbsenceDialog;$('absenceForm').addEventListener('submit',applyAbsenceRange);$('propagateForm').addEventListener('submit',applyPropagation);$('unlockArchive').onclick=unlockArchivedWeek;
   $('printBtn').onclick=()=>{renderPrint();fitDetailDensity();setTimeout(()=>window.print(),60)};$('pdfBtn').onclick=()=>downloadPdf();$('emailBtn').onclick=openEmailDialog;
   $('logoFile').onchange=onLogoFileChange;$('removeLogo').onclick=removeLogo;
-  ['sortPrimary','sortSecondary','sortDirection'].forEach(id=>$(id).onchange=()=>{renderPrint();fitDetailDensity()});
   $('addPerson').onclick=()=>openPersonDialog();$('personSource').onchange=onPersonSourceChange;$('sourcePerson').onchange=applySourceSelection;$('personForm').addEventListener('submit',savePersonFromDialog);
   $('guestForm').addEventListener('submit',saveGuestFromDialog);
   $('closureForm').addEventListener('submit',saveClosure);
@@ -828,7 +845,7 @@ function configDate(p,which){const typed=which==='start'?p.DateDebutDate:p.DateF
 function lastModifiedText(w){if(!w)return'—';const d=dateFromGrist(w.ModifieLeDT)||(w.ModifieLe?new Date(w.ModifieLe):null);return d&&isValidDate(d)?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(d):'—'}
 
 function sortPeopleSimple(arr,field='name'){return [...arr].sort((a,b)=>cmpField(a,b,field)||comparePeople(a,b))}
-function sortPeopleForDetail(arr){const p=$('sortPrimary').value,s=$('sortSecondary').value,dir=$('sortDirection').value==='desc'?-1:1;return [...arr].sort((a,b)=>dir*(cmpField(a,b,p)||cmpField(a,b,s)||comparePeople(a,b)))}
+function sortPeopleForDetail(arr){return [...arr].sort(comparePeople)}
 function cmpField(a,b,f){const v=x=>f==='name'?`${x.Nom||''} ${x.Prenom||''}`:f==='diet'?x.Regime||'':f==='texture'?x.Texture||'':f==='active'?(x.Actif!==false?'0':'1'):x.Groupe||'';return String(v(a)).localeCompare(String(v(b)),'fr',{sensitivity:'base'})}
 function comparePeople(a,b){return String(a.Nom||'').localeCompare(String(b.Nom||''),'fr',{sensitivity:'base'})||String(a.Prenom||'').localeCompare(String(b.Prenom||''),'fr',{sensitivity:'base'})}
 function uniquePeople(rows){const m=new Map();rows.forEach(x=>{if(!m.has(x.PersonKey))m.set(x.PersonKey,x)});return[...m.values()]}

@@ -514,3 +514,174 @@
   #tab-commande .editor-group table{min-width:1460px}
   #tab-modele .template-editor-group table{min-width:1450px}
 }
+
+/* =========================================================
+   V18 — 14/09/2026
+   - menus Régime / Texture plus larges et sans débordement
+   - libellés Hypocalorique / Hypolipidique entièrement visibles
+   - couleurs de fond selon la valeur sélectionnée
+   - bandeaux RDC / 1er étage / Professionnels sur toute la largeur du tableau
+   - suppression de la colonne Note cuisine des tableaux écran
+   ========================================================= */
+
+/* Colonnes Régime / Texture : assez larges pour tous les libellés. */
+#tab-commande .editor-group th:nth-child(2),
+#tab-modele .template-editor-group th:nth-child(2){
+  width:175px!important;
+  min-width:175px!important;
+}
+#tab-commande .editor-group th:nth-child(3),
+#tab-modele .template-editor-group th:nth-child(3){
+  width:175px!important;
+  min-width:175px!important;
+}
+#tab-commande .editor-group td:nth-child(2),
+#tab-commande .editor-group td:nth-child(3),
+#tab-modele .template-editor-group td:nth-child(2),
+#tab-modele .template-editor-group td:nth-child(3){
+  width:175px!important;
+  min-width:175px!important;
+  max-width:175px!important;
+}
+
+/* Les selects restent contenus dans leur cellule, sans déborder. */
+#tab-commande .screen-profile-select,
+#tab-modele .screen-profile-select,
+.settings-table .inline-profile-select{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  height:34px!important;
+  padding:5px 30px 5px 10px!important;
+  font-size:12px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+
+/* Couleurs de fond Régime / Texture suivant la valeur réellement sélectionnée. */
+.profile-normal{
+  background:#eceff2!important;
+  border-color:#c5ccd3!important;
+  color:#374151!important;
+}
+.profile-brown{
+  background:#ead4c2!important;
+  border-color:#bd8f6a!important;
+  color:#5c3c25!important;
+}
+.profile-purple{
+  background:#e4d7fb!important;
+  border-color:#a98ce8!important;
+  color:#563d8c!important;
+}
+.profile-yellow{
+  background:#fff3b8!important;
+  border-color:#e3ca61!important;
+  color:#6e5a0a!important;
+}
+.profile-green{
+  background:#d7f0db!important;
+  border-color:#79c78a!important;
+  color:#235c31!important;
+}
+.profile-red{
+  background:#f8d6d6!important;
+  border-color:#dc8d8d!important;
+  color:#8a2f2f!important;
+}
+
+/* Les options restent lisibles à l'ouverture du menu natif. */
+.screen-profile-select option,
+.inline-profile-select option{
+  background:#fff!important;
+  color:#17324a!important;
+}
+
+/* Les bandeaux de groupe suivent toute la largeur réelle du tableau. */
+#tab-commande .editor-group .group-title{
+  min-width:1500px!important;
+  width:max-content!important;
+  box-sizing:border-box!important;
+}
+#tab-modele .template-editor-group .group-title{
+  min-width:1490px!important;
+  width:max-content!important;
+  box-sizing:border-box!important;
+}
+
+/* Après suppression de Note cuisine, Gestion est la dernière colonne. */
+#tab-commande .editor-group th:last-child,
+#tab-modele .template-editor-group th:last-child{
+  width:135px!important;
+  min-width:135px!important;
+}
+
+/* Largeur globale recalculée avec les colonnes Régime/Texture élargies. */
+#tab-commande .editor-group table{
+  min-width:1500px!important;
+}
+#tab-modele .template-editor-group table{
+  min-width:1490px!important;
+}
+
+/* Le bandeau défile avec le tableau, sans s'arrêter avant la colonne Gestion. */
+#tab-commande .editor-group,
+#tab-modele .template-editor-group{
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+}
+
+
+/* V19 — simplification de l'écran Commande repas (14/09/2026)
+   - suppression du bouton de création automatique des 8 semaines
+   - suppression du bloc global "Tri du détail"
+   - alignement du bouton Outlook sur la rangée des actions */
+
+/* Le bouton Outlook doit rester entièrement sur une seule ligne et centré verticalement. */
+#emailBtn{
+  min-width:220px!important;
+  width:auto!important;
+  white-space:nowrap!important;
+  line-height:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:end!important;
+  padding:0 18px!important;
+  overflow:visible!important;
+}
+
+/* Les actions principales utilisent une ligne souple sans écraser Outlook. */
+@media (min-width:1001px){
+  .head-actions{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    justify-content:flex-end!important;
+    align-items:flex-end!important;
+    gap:8px!important;
+  }
+  .head-actions label{
+    width:160px!important;
+    min-width:160px!important;
+    margin:0!important;
+  }
+  .head-actions label select,
+  .head-actions > button{
+    height:40px!important;
+    min-height:40px!important;
+    margin:0!important;
+  }
+  #saveWeekOk{
+    min-height:40px!important;
+    align-items:center!important;
+  }
+}
+
+/* Le panneau latéral n'a plus à réserver une colonne pour le bouton 8 semaines. */
+@media (min-width:1001px){
+  .sidebar{
+    grid-template-columns:235px 180px 220px!important;
+    column-gap:14px!important;
+  }
+}
