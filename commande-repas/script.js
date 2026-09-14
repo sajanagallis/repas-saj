@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V9 : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V12 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -20,6 +20,9 @@ let sourceUsers=[],sourcePros=[],config=[],templateRows=[],weeks=[],commands=[],
 let repartitions=[],rooms=[];
 let saveTimer=null;
 let archiveEditUnlocked=false;
+let screenGroupSort={RDC:'name','1er étage':'name',Professionnel:'name','Stagiaire / Visiteur':'name'};
+let templateGroupFilter='all',templateSort='name';
+let settingsGroupFilter='all',settingsActiveFilter='all',settingsSort='name';
 const $=id=>document.getElementById(id);
 
 grist.ready({requiredAccess:'full'});
@@ -38,7 +41,7 @@ async function init(){
     await loadAll();
     await syncTemplateFromConfig();
     await loadAll();
-    await ensureRollingWeeks(8);
+    await ensureWeek(weekStart);
     await archivePastWeeks();
     await loadAll();
     const currentKey=weekKey(weekStart);
@@ -185,15 +188,18 @@ function inferFloor(userId){const rep=repartitions.find(r=>+r.Usagers===+userId)
 
 async function ensureRollingWeeks(count=8){
   const start=mondayOf(new Date());
-  for(let i=0;i<=count;i++) await ensureWeek(addDays(start,i*7));
+  let created=0;
+  for(let i=1;i<=count;i++){ if(await ensureWeek(addDays(start,i*7))) created++; }
+  return created;
 }
 async function ensureWeek(date){
-  const key=weekKey(date); if(weeks.some(w=>w.SemaineKey===key))return;
+  const key=weekKey(date); if(weeks.some(w=>w.SemaineKey===key))return false;
   const now=new Date(),iso=now.toISOString(),monday=parseKey(key);
   await grist.docApi.applyUserActions([['AddRecord',TABLES.weeks,null,{SemaineKey:key,DebutSemaine:gristDate(monday),FinSemaine:gristDate(addDays(monday,4)),Annee:monday.getFullYear(),Statut:'À préparer',Commentaire:'',CreeLe:iso,ModifieLe:iso,CommandeeLe:'',CreeLeDT:gristDateTime(now),ModifieLeDT:gristDateTime(now)}]]);
   await loadAll();
   await createWeekRows(key);
   await loadAll();
+  return true;
 }
 async function createWeekRows(key){
   const monday=parseKey(key);const actions=[];
@@ -245,7 +251,7 @@ function renderWeekNavigation(){
 function renderCommande(){
   const wk=currentWeek();const label=weekLabel(weekStart);$('weekTitle').textContent=label;$('weekStatus').value=effectiveWeekStatus(wk);$('weekComment').value=wk?.Commentaire||'';
   $('printWeek1').textContent=label;$('printWeek2').textContent=label;
-  renderClosureBanners();renderDashboard();renderEditor();renderAudit();renderPrint();fitDetailDensity();
+  renderClosureBanners();renderEditor();renderAudit();renderPrint();fitDetailDensity();
   const archived=isWeekArchived(wk);
   $('unlockArchive').hidden=!archived||archiveEditUnlocked;
   $('editor').classList.toggle('locked',archived&&!archiveEditUnlocked);
@@ -266,6 +272,7 @@ function renderEditor(){
   const gs=currentGuests(); if(gs.length)html+=guestEditorGroup(gs,c);
   html+=`<div class="editor-add"><button id="addGuest">+ Ajouter stagiaire / visiteur</button></div>`;
   $('editor').innerHTML=html;
+  document.querySelectorAll('[data-group-sort]').forEach(s=>s.onchange=e=>{screenGroupSort[e.target.dataset.groupSort]=e.target.value;renderEditor()});
   document.querySelectorAll('[data-order-id]').forEach(s=>s.onchange=onOrderTypeChange);
   document.querySelectorAll('[data-time-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-bread-id]').forEach(x=>x.onchange=onExtraChange);
@@ -278,14 +285,16 @@ function renderEditor(){
 function editorGroup(group,c){
   const people=uniquePeople(c.filter(x=>x.Groupe===group));if(!people.length)return'';
   const cls=group==='RDC'?'g-rdc':group==='1er étage'?'g-floor':'g-pro';
-  return `<section class="editor-group ${cls}"><div class="group-title"><span>${group==='Professionnel'?'PROFESSIONNELS':esc(group)}</span><span>${people.length} personne${people.length>1?'s':''}</span></div>${editorTable(people,c)}</section>`
+  const sort=screenGroupSort[group]||'name';
+  return `<section class="editor-group ${cls}"><div class="group-title"><span>${group==='Professionnel'?'PROFESSIONNELS':esc(group)}</span><span class="group-tools"><label>Trier par <select data-group-sort="${esc(group)}"><option value="name" ${sort==='name'?'selected':''}>Nom</option><option value="diet" ${sort==='diet'?'selected':''}>Régime</option><option value="texture" ${sort==='texture'?'selected':''}>Texture</option></select></label><b>${people.length} personne${people.length>1?'s':''}</b></span></div>${editorTable(people,c,false,sort)}</section>`
 }
 function guestEditorGroup(gs,c){
   const rows=gs.map(g=>({PersonKey:g.PersonKey||('G:'+g.id),Nom:g.Nom,Prenom:g.Prenom,Groupe:'Stagiaire / Visiteur',Regime:g.Regime,Texture:g.Texture,guest:g}));
-  return `<section class="editor-group g-guest"><div class="group-title">STAGIAIRES / VISITEURS</div>${editorTable(rows,c,true)}</section>`
+  const sort=screenGroupSort['Stagiaire / Visiteur']||'name';
+  return `<section class="editor-group g-guest"><div class="group-title"><span>STAGIAIRES / VISITEURS</span><span class="group-tools"><label>Trier par <select data-group-sort="Stagiaire / Visiteur"><option value="name" ${sort==='name'?'selected':''}>Nom</option><option value="diet" ${sort==='diet'?'selected':''}>Régime</option><option value="texture" ${sort==='texture'?'selected':''}>Texture</option></select></label></span></div>${editorTable(rows,c,true,sort)}</section>`
 }
-function editorTable(people,c,isGuest=false){return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine</th>${isGuest?'<th></th>':''}</tr></thead><tbody>${people.sort(comparePeople).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const note=rows.find(x=>x.NoteCuisine)?.NoteCuisine||'';return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell">${pill(p.Regime,'diet')}</td><td class="meta-cell">${pill(p.Texture,'texture')}</td>${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}<td><input class="note-input" data-note-person="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td>${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
-function editorDayCell(c){if(!c)return'<td>—</td>';const closed=c.TypeCommande==='Fermé';const mealClass='meal-'+norm(c.TypeCommande).replace(/[^a-z0-9]+/g,'-');return `<td class="day-cell ${closed?'closed-cell':''} ${mealClass}">${closed?'<b>FERMÉ</b>':`<div class="order-line"><select class="order-select" data-order-id="${c.id}">${TYPES.map(t=>`<option ${c.TypeCommande===t?'selected':''}>${t}</option>`).join('')}</select><button class="mini propagate" type="button" title="Appliquer aux semaines suivantes" data-propagate-id="${c.id}">↪</button></div>${extrasHtml(c)}`}</td>`}
+function editorTable(people,c,isGuest=false,sortField='name'){return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine</th>${isGuest?'<th></th>':''}</tr></thead><tbody>${sortPeopleSimple(people,sortField).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const note=rows.find(x=>x.NoteCuisine)?.NoteCuisine||'';return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell">${pill(p.Regime,'diet')}</td><td class="meta-cell">${pill(p.Texture,'texture')}</td>${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}<td><input class="note-input" data-note-person="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td>${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
+function editorDayCell(c){if(!c)return'<td>—</td>';const closed=c.TypeCommande==='Fermé';const mealClass='meal-'+norm(c.TypeCommande).replace(/[^a-z0-9]+/g,'-');return `<td class="day-cell ${closed?'closed-cell':''} ${mealClass}">${closed?'<b>FERMÉ</b>':`<div class="order-line"><select class="order-select" data-order-id="${c.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${c.TypeCommande===t?'selected':''}>${t}</option>`).join('')}</select><button class="mini propagate" type="button" title="Appliquer aux semaines suivantes" data-propagate-id="${c.id}">↪</button></div>${extrasHtml(c)}`}</td>`}
 function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-time-id="${c.id}" value="${esc(c.HeureRetrait||'')}">`;if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
 
 async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const type=e.target.value;const old=commands.find(x=>x.id===id);if(!old)return;await updateCmd(id,{TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(old.HeureRetrait||''):'',Pain:type==='Pique-nique'?(old.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(old.OptionPique||''):''},`Type de repas : ${old.TypeCommande} → ${type}`)}
@@ -349,12 +358,31 @@ function fitDetailDensity(){
 
 function legendsHtml(){return `<div class="legend-wrap"><div><b>Légende des régimes :</b><div class="legend">${DIETS.map(x=>pill(x,'diet')).join(' ')}</div></div><div><b>Légende des textures :</b><div class="legend">${TEXTURES.map(x=>pill(x,'texture')).join(' ')}</div></div></div>`}
 function pill(value,kind){const cls=dotClass(value,kind);return `${cls?`<span class="dot ${cls}"></span>`:''}${esc(value||'')}`}
-function dotClass(v,kind){const n=norm(v);if(kind==='diet'){if(n==='hypocalorique')return'dot-hypo';if(n==='hypolipidique')return'dot-hypolipid';if(n==='sans porc')return'dot-pork';if(n==='sans viande')return'dot-meat';return''}if(n==='purée lisse')return'dot-puree';if(n==='haché lubrifié')return'dot-hache';return''}
+function dotClass(v,kind){const n=norm(v);if(kind==='diet'){if(n==='hypocalorique')return'dot-hypo';if(n==='hypolipidique')return'';if(n==='sans porc')return'dot-pork';if(n==='sans viande')return'dot-meat';return''}if(n==='purée lisse')return'dot-puree';if(n==='haché lubrifié')return'dot-hache';return''}
 
-function renderHistory(){const years=storedYears();const current=$('historyYear')?.value||'all';$('historyYear').innerHTML=`<option value="all">Toutes</option>${years.map(y=>`<option value="${y}" ${String(y)===String(current)?'selected':''}>${y}</option>`).join('')}`;const filter=$('historyYear').value;const rows=[...weeks].filter(w=>filter==='all'||weekYearOf(w)===+filter).sort((a,b)=>b.SemaineKey.localeCompare(a.SemaineKey));$('historyList').innerHTML=`<div class="history-head"><span>Semaine</span><span>Année</span><span>Statut</span><span>Dernière modification</span></div>`+(rows.map(w=>`<div class="history-row"><button data-history="${w.SemaineKey}">${weekLabel(parseKey(w.SemaineKey))}</button><span>${weekYearOf(w)}</span><span class="status ${statusClass(effectiveWeekStatus(w))}">${esc(w.Rectificative?'Rectificative':effectiveWeekStatus(w))}</span><span>${esc(lastModifiedText(w))}</span></div>`).join('')||'<p>Aucune semaine.</p>');document.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{openWeek(b.dataset.history);switchTab('commande')})}
+function renderHistory(){
+  const today=mondayOf(new Date());
+  const pastWeeks=[...weeks].filter(w=>{const d=parseKey(w.SemaineKey);return isValidDate(d)&&d<today;});
+  const years=[...new Set(pastWeeks.map(weekYearOf))].sort((a,b)=>b-a);
+  const current=$('historyYear')?.value||'all';
+  $('historyYear').innerHTML=`<option value="all">Toutes</option>${years.map(y=>`<option value="${y}" ${String(y)===String(current)?'selected':''}>${y}</option>`).join('')}`;
+  if(current!=='all'&&!years.includes(+current)) $('historyYear').value='all';
+  const filter=$('historyYear').value;
+  const rows=pastWeeks.filter(w=>filter==='all'||weekYearOf(w)===+filter).sort((a,b)=>b.SemaineKey.localeCompare(a.SemaineKey));
+  $('historyList').innerHTML=`<div class="history-head"><span>Semaine</span><span>Année</span><span>Statut</span><span>Dernière modification</span></div>`+(rows.map(w=>`<div class="history-row"><button data-history="${w.SemaineKey}">${weekLabel(parseKey(w.SemaineKey))}</button><span>${weekYearOf(w)}</span><span class="status ${statusClass(effectiveWeekStatus(w))}">${esc(w.Rectificative?'Rectificative':effectiveWeekStatus(w))}</span><span>${esc(lastModifiedText(w))}</span></div>`).join('')||'<p>Aucune commande passée dans l’historique.</p>');
+  document.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{openWeek(b.dataset.history);switchTab('commande')});
+}
 
 function renderSettings(){
-  const rows=[...config].sort(comparePeople);$('peopleSettings').innerHTML=`<table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td>${esc(p.Groupe)}</td><td>${pill(p.Regime,'diet')}</td><td>${pill(p.Texture,'texture')}</td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
+  let rows=[...config];
+  if(settingsGroupFilter!=='all')rows=rows.filter(p=>p.Groupe===settingsGroupFilter);
+  if(settingsActiveFilter==='active')rows=rows.filter(p=>p.Actif!==false);
+  if(settingsActiveFilter==='inactive')rows=rows.filter(p=>p.Actif===false);
+  rows=sortPeopleSimple(rows,settingsSort);
+  $('peopleSettings').innerHTML=`<div class="list-controls"><label>Groupe <select id="settingsGroupFilter"><option value="all">Tous</option><option value="RDC" ${settingsGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${settingsGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${settingsGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Actif <select id="settingsActiveFilter"><option value="all">Tous</option><option value="active" ${settingsActiveFilter==='active'?'selected':''}>Actifs</option><option value="inactive" ${settingsActiveFilter==='inactive'?'selected':''}>Inactifs</option></select></label><label>Trier par <select id="settingsSort"><option value="name" ${settingsSort==='name'?'selected':''}>Nom</option><option value="group" ${settingsSort==='group'?'selected':''}>Groupe</option><option value="diet" ${settingsSort==='diet'?'selected':''}>Régime</option><option value="texture" ${settingsSort==='texture'?'selected':''}>Texture</option><option value="active" ${settingsSort==='active'?'selected':''}>Actif</option></select></label></div><table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td>${esc(p.Groupe)}</td><td>${pill(p.Regime,'diet')}</td><td>${pill(p.Texture,'texture')}</td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
+  $('settingsGroupFilter').onchange=e=>{settingsGroupFilter=e.target.value;renderSettings()};
+  $('settingsActiveFilter').onchange=e=>{settingsActiveFilter=e.target.value;renderSettings()};
+  $('settingsSort').onchange=e=>{settingsSort=e.target.value;renderSettings()};
   document.querySelectorAll('[data-edit-person]').forEach(b=>b.onclick=()=>editPerson(+b.dataset.editPerson));document.querySelectorAll('[data-toggle-person]').forEach(b=>b.onclick=()=>togglePerson(+b.dataset.togglePerson));
   const cls=[...closures].filter(x=>x.Actif!==false).sort((a,b)=>a.DateDebut.localeCompare(b.DateDebut));$('closureList').innerHTML=cls.length?`<table class="settings-table"><thead><tr><th>Du</th><th>Au</th><th>Motif</th><th></th></tr></thead><tbody>${cls.map(x=>`<tr><td>${frDate(parseKey(x.DateDebut))}</td><td>${frDate(parseKey(x.DateFin))}</td><td>${esc(x.Motif)}</td><td><button class="mini danger" data-remove-closure="${x.id}">Supprimer</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Aucune fermeture enregistrée.</p>';
   document.querySelectorAll('[data-remove-closure]').forEach(b=>b.onclick=()=>removeClosure(+b.dataset.removeClosure));
@@ -362,23 +390,46 @@ function renderSettings(){
 
 function renderTemplateEditor(){
   const root=$('templateSettings');if(!root)return;
-  const people=[...config].filter(p=>p.Actif!==false).sort(comparePeople);
-  if(!people.length){root.innerHTML='<p class="hint">Aucune personne active.</p>';return}
-  root.innerHTML=`<table class="settings-table template-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine habituelle</th></tr></thead><tbody>${people.map(p=>{
+  let people=[...config].filter(p=>p.Actif!==false);
+  if(templateGroupFilter!=='all')people=people.filter(p=>p.Groupe===templateGroupFilter);
+  people=sortPeopleSimple(people,templateSort);
+  const controls=`<div class="list-controls template-controls"><label>Groupe <select id="templateGroupFilter"><option value="all">Tous</option><option value="RDC" ${templateGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${templateGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${templateGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Trier par <select id="templateSort"><option value="name" ${templateSort==='name'?'selected':''}>Nom</option><option value="group" ${templateSort==='group'?'selected':''}>Groupe</option><option value="diet" ${templateSort==='diet'?'selected':''}>Régime</option><option value="texture" ${templateSort==='texture'?'selected':''}>Texture</option></select></label></div>`;
+  if(!people.length){root.innerHTML=controls+'<p class="hint">Aucune personne correspondant au filtre.</p>';bindTemplateControls();return}
+  root.innerHTML=controls+`<table class="settings-table template-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Note cuisine habituelle</th></tr></thead><tbody>${people.map(p=>{
     const rows=DAYS.map(d=>templateFor(p.PersonKey,d));const note=rows.find(r=>r?.NoteCuisine)?.NoteCuisine||'';
-    return `<tr><td class="name sticky-name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="sticky-group">${esc(p.Groupe)}</td><td>${pill(p.Regime,'diet')}</td><td>${pill(p.Texture,'texture')}</td>${DAYS.map((d,i)=>templateDayCell(rows[i],p,d)).join('')}<td><input class="note-input" data-template-note="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td></tr>`
+    const rowCls=p.Groupe==='RDC'?'template-rdc':p.Groupe==='1er étage'?'template-floor':p.Groupe==='Professionnel'?'template-pro':'template-guest';
+    return `<tr class="${rowCls}"><td class="name sticky-name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="sticky-group">${esc(p.Groupe)}</td><td>${pill(p.Regime,'diet')}</td><td>${pill(p.Texture,'texture')}</td>${DAYS.map((d,i)=>templateDayCell(rows[i],p,d)).join('')}<td><input class="note-input" data-template-note="${esc(p.PersonKey)}" value="${esc(note)}" placeholder="Facultatif"></td></tr>`
   }).join('')}</tbody></table>`;
+  bindTemplateControls();
   document.querySelectorAll('[data-template-id]').forEach(s=>s.onchange=saveTemplateType);
+  document.querySelectorAll('[data-template-new]').forEach(s=>s.onchange=createTemplateType);
   document.querySelectorAll('[data-template-time]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-bread]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-picnic]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-note]').forEach(x=>x.onchange=saveTemplateNote);
   renderTemplateMeta();
 }
+function bindTemplateControls(){
+  const g=$('templateGroupFilter'),s=$('templateSort');
+  if(g)g.onchange=e=>{templateGroupFilter=e.target.value;renderTemplateEditor()};
+  if(s)s.onchange=e=>{templateSort=e.target.value;renderTemplateEditor()};
+}
 function templateDayCell(row,p,d){
-  if(!row)return'<td>—</td>';
-  const type=row.TypeCommande||'Absent';
-  return `<td class="day-cell"><select class="order-select" data-template-id="${row.id}">${TYPES.map(t=>`<option ${type===t?'selected':''}>${t}</option>`).join('')}</select>${templateExtrasHtml(row)}</td>`
+  const type=row?.TypeCommande || (p[d.key]?'Repas sur place':'Absent');
+  const mealClass='meal-'+norm(type).replace(/[^a-z0-9]+/g,'-');
+  const groupClass=p.Groupe==='RDC'?'template-group-rdc':p.Groupe==='1er étage'?'template-group-floor':p.Groupe==='Professionnel'?'template-group-pro':'template-group-guest';
+  if(!row){
+    return `<td class="day-cell ${mealClass} ${groupClass}"><select class="order-select" data-template-new="1" data-person-key="${esc(p.PersonKey)}" data-template-day="${d.key}">${TYPES.map(t=>`<option value="${esc(t)}" ${type===t?'selected':''}>${t}</option>`).join('')}</select></td>`;
+  }
+  return `<td class="day-cell ${mealClass} ${groupClass}"><select class="order-select" data-template-id="${row.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${type===t?'selected':''}>${t}</option>`).join('')}</select>${templateExtrasHtml(row)}</td>`
+}
+async function createTemplateType(e){
+  const personKey=e.target.dataset.personKey, day=e.target.dataset.templateDay, type=e.target.value;
+  if(!personKey||!day)return;
+  const fields={PersonKey:personKey,Jour:day,TypeCommande:type,HeureRetrait:'',Pain:type==='Pique-nique'?'Pain':'',OptionPique:'',NoteCuisine:''};
+  await grist.docApi.applyUserActions([['AddRecord',TABLES.template,null,fields]]);
+  await saveSetting('templateLastSaved',new Date().toISOString());
+  await loadAll();renderTemplateEditor();showTemplateSaved();
 }
 function templateExtrasHtml(r){if(!['Plateau','Container','Pique-nique'].includes(r.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-template-time="${r.id}" value="${esc(r.HeureRetrait||'')}">`;if(r.TypeCommande==='Pique-nique')s+=`<select data-template-bread="${r.id}"><option ${r.Pain==='Pain'?'selected':''}>Pain</option><option ${r.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-template-picnic="${r.id}"><option value="" ${!r.OptionPique?'selected':''}>Standard</option><option ${r.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${r.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
 async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();showTemplateSaved();toast('Semaine habituelle enregistrée. Les semaines déjà créées ne sont pas modifiées.');}
@@ -395,7 +446,7 @@ function renderTemplateMeta(){
 }
 function showTemplateSaved(){
   const ok=$('saveTemplateOk');if(!ok)return;
-  ok.hidden=false;clearTimeout(showTemplateSaved._t);showTemplateSaved._t=setTimeout(()=>{ok.hidden=true},3500);
+  ok.hidden=false;
 }
 async function saveTemplateExplicitly(){
   const btn=$('saveTemplateBtn');if(!btn)return;
@@ -470,7 +521,7 @@ function getSetting(key,fallback=''){return settings.find(x=>x.Cle===key)?.Valeu
 function bindUI(){
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   $('prevWeek').onclick=()=>changeWeek(-7);$('nextWeek').onclick=()=>changeWeek(7);$('thisWeek').onclick=()=>openWeek(weekKey(mondayOf(new Date())));$('weekPicker').onchange=()=>openWeek(weekKey(mondayOf(parseKey($('weekPicker').value))));$('weekYear').onchange=()=>openYear(+$('weekYear').value);$('historyYear').onchange=renderHistory;
-  $('futureWeeks').onclick=async()=>{await ensureRollingWeeks(8);await loadAll();renderAll();toast('Semaines futures vérifiées.');};
+  $('futureWeeks').onclick=async()=>{const created=await ensureRollingWeeks(8);await loadAll();renderAll();toast(created?`${created} semaine(s) créée(s). Les semaines déjà existantes n’ont pas été modifiées.`:'Les 8 semaines à venir existent déjà. Aucune donnée n’a été modifiée.');};
   $('saveWeekBtn').onclick=saveCurrentWeekExplicitly;
   $('templateFromPresence').onclick=resetTemplateFromPresence;$('templateFromCurrent').onclick=copyCurrentWeekToTemplate;$('saveTemplateBtn').onclick=saveTemplateExplicitly;
   $('weekStatus').onchange=saveWeekStatus;$('weekComment').oninput=debounceSaveComment;$('resetWeek').onclick=resetWeekFromTemplate;
@@ -518,8 +569,7 @@ async function saveCurrentWeekExplicitly(){
     if(comment!==(w.Commentaire||''))fields.Commentaire=comment;
     if(Object.keys(fields).length){fields.ModifieLe=now.toISOString();fields.ModifieLeDT=gristDateTime(now);fields.ControleOK=false;if(w.CommandeeLeDT)fields.Rectificative=true;actions.push(['UpdateRecord',TABLES.weeks,w.id,fields]);}
     if(actions.length){await grist.docApi.applyUserActions(actions);await logAudit({action:'Enregistrement manuel',oldValue:'',newValue:'',detail:'Commande enregistrée depuis le bouton Enregistrer'});await loadAll();renderAll();}
-    ok.hidden=false; $('saveState').textContent='Modifications enregistrées';
-    setTimeout(()=>{ok.hidden=true;$('saveState').textContent=''},3000);
+    ok.hidden=false; $('saveState').textContent='✓ Modifications enregistrées';
   }catch(err){console.error(err);toast('Échec de l’enregistrement : '+err.message)}
   finally{btn.classList.remove('saving');btn.disabled=false;btn.textContent='Enregistrer'}
 }
@@ -627,8 +677,9 @@ function dateFromGrist(v){if(!v)return null;const n=Number(v);return Number.isFi
 function configDate(p,which){const typed=which==='start'?p.DateDebutDate:p.DateFinDate;const text=which==='start'?p.DateDebut:p.DateFin;return dateFromGrist(typed)||(text?parseKey(text):null)}
 function lastModifiedText(w){if(!w)return'—';const d=dateFromGrist(w.ModifieLeDT)||(w.ModifieLe?new Date(w.ModifieLe):null);return d&&isValidDate(d)?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(d):'—'}
 
+function sortPeopleSimple(arr,field='name'){return [...arr].sort((a,b)=>cmpField(a,b,field)||comparePeople(a,b))}
 function sortPeopleForDetail(arr){const p=$('sortPrimary').value,s=$('sortSecondary').value,dir=$('sortDirection').value==='desc'?-1:1;return [...arr].sort((a,b)=>dir*(cmpField(a,b,p)||cmpField(a,b,s)||comparePeople(a,b)))}
-function cmpField(a,b,f){const v=x=>f==='name'?`${x.Nom||''} ${x.Prenom||''}`:f==='diet'?x.Regime||'':f==='texture'?x.Texture||'':x.Groupe||'';return String(v(a)).localeCompare(String(v(b)),'fr',{sensitivity:'base'})}
+function cmpField(a,b,f){const v=x=>f==='name'?`${x.Nom||''} ${x.Prenom||''}`:f==='diet'?x.Regime||'':f==='texture'?x.Texture||'':f==='active'?(x.Actif!==false?'0':'1'):x.Groupe||'';return String(v(a)).localeCompare(String(v(b)),'fr',{sensitivity:'base'})}
 function comparePeople(a,b){return String(a.Nom||'').localeCompare(String(b.Nom||''),'fr',{sensitivity:'base'})||String(a.Prenom||'').localeCompare(String(b.Prenom||''),'fr',{sensitivity:'base'})}
 function uniquePeople(rows){const m=new Map();rows.forEach(x=>{if(!m.has(x.PersonKey))m.set(x.PersonKey,x)});return[...m.values()]}
 function statusForPerson(p){if(p.Groupe==='Professionnel')return'Professionnel';if(p.Groupe==='Stagiaire / Visiteur')return guests.find(g=>g.PersonKey===p.PersonKey)?.TypePersonne||'Invité';return'Usager'}

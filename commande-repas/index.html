@@ -35,7 +35,7 @@
           <div class="nav-row"><button id="prevWeek">‹</button><button id="thisWeek">Cette semaine</button><button id="nextWeek">›</button></div>
           <label>Année <select id="weekYear"></select></label>
           <label>Semaine <input type="date" id="weekPicker"></label>
-          <button id="futureWeeks" class="secondary full">Créer / vérifier les 8 semaines à venir</button>
+          <button id="futureWeeks" class="secondary full">Créer les 8 semaines à venir</button>
           <h3>Semaines enregistrées</h3>
           <div id="weekList" class="week-list"></div>
         </aside>
@@ -53,7 +53,6 @@
             </div>
           </div>
 
-          <div id="dashboard" class="dashboard"></div>
           <div class="safety-actions">
             <button id="checkOrder" class="primary">Vérifier la commande</button>
             <button id="absenceBtn">Absence exceptionnelle</button>
@@ -85,7 +84,7 @@
           </div>
           <div class="model-actions">
             <button id="templateFromPresence" type="button">Initialiser depuis les présences habituelles</button>
-            <button id="templateFromCurrent" type="button">Copier la semaine sélectionnée</button>
+            <button id="templateFromCurrent" type="button" title="Remplace la semaine habituelle par les repas de la semaine actuellement ouverte, sans modifier les autres semaines.">Utiliser la semaine sélectionnée comme modèle</button>
             <button id="saveTemplateBtn" class="save-week-btn" type="button">Enregistrer la semaine habituelle</button>
             <span id="saveTemplateOk" class="save-week-ok" aria-live="polite" hidden>✓ Enregistré</span>
           </div>
@@ -98,7 +97,7 @@
       </section>
     </section>
 
-    <section id="tab-historique" class="tab-panel"><div class="panel-card"><div class="panel-title"><div><h2>Historique des commandes</h2><p>Cliquer sur une semaine pour l'ouvrir dans le widget.</p></div><label class="history-year-label">Année <select id="historyYear"></select></label></div><div id="historyList"></div></div></section>
+    <section id="tab-historique" class="tab-panel"><div class="panel-card"><div class="panel-title"><div><h2>Historique des commandes</h2><p>Seules les semaines terminées apparaissent ici. Cliquer sur une semaine pour l'ouvrir dans le widget.</p></div><label class="history-year-label">Année <select id="historyYear"></select></label></div><div id="historyList"></div></div></section>
 
     <section id="tab-parametres" class="tab-panel">
       <div class="settings-grid">
@@ -141,7 +140,7 @@
       </div>
     </section>
 
-    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine modèle :</b> chaque nouvelle semaine est créée à partir de la semaine modèle. Une fois créée, elle devient indépendante et peut être modifiée sans changer le modèle ni les autres semaines.</p><p><b>Semaines futures :</b> le widget crée automatiquement un horizon de 8 semaines à partir de cette semaine modèle.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
+    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine habituelle :</b> chaque nouvelle semaine est créée à partir de cette base. Une fois créée, elle devient indépendante et peut être modifiée sans changer le modèle ni les autres semaines. Le bouton « Utiliser la semaine sélectionnée comme modèle » recopie volontairement la semaine ouverte vers cette base.</p><p><b>Semaines futures :</b> le bouton « Créer les 8 semaines à venir » crée uniquement les semaines manquantes. Une semaine déjà existante n’est jamais écrasée.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
   </main>
 
   <div id="toast" class="toast no-print" hidden></div>

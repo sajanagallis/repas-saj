@@ -157,9 +157,9 @@
   .editor-group{margin:0;border:1px solid #cbdfe9;border-radius:9px;background:#fff;box-shadow:0 1px 2px #244b6810}
   .group-title{min-height:43px;padding:9px 16px 8px 48px;font-size:21px;align-items:center;position:relative}
   .group-title::before{position:absolute;left:18px;font-size:23px;line-height:1}
-  .g-rdc .group-title{background:linear-gradient(90deg,#9ee9b2,#bcefc8)}.g-rdc .group-title::before{content:'🍴'}
-  .g-floor .group-title{background:linear-gradient(90deg,#86cdf7,#b8e2fb)}.g-floor .group-title::before{content:'🍴'}
-  .g-pro .group-title{background:linear-gradient(90deg,#c9a8f4,#dec9f8);color:#35118c}.g-pro .group-title::before{content:'👥'}
+  .g-rdc .group-title{background:var(--rdc)}.g-rdc .group-title::before{content:'🍴'}
+  .g-floor .group-title{background:var(--floor)}.g-floor .group-title::before{content:'🍴'}
+  .g-pro .group-title{background:var(--pro);color:#35118c}.g-pro .group-title::before{content:'👥'}
   .g-guest .group-title{background:linear-gradient(90deg,#ffc4df,#ffdbeb)}.g-guest .group-title::before{content:'👤'}
   .group-title span:last-child{font-size:15px;color:inherit}
 
@@ -176,11 +176,15 @@
   .day-cell{min-width:0;padding:5px 6px;background:#fff}
   .order-line{gap:3px}.order-select{width:100%;min-width:0;height:31px;padding:3px 28px 3px 8px;border:1px solid #b9cfe0;border-radius:6px;background:#fff;color:#17324a;font-size:12px}
   .propagate{width:25px;min-width:25px;padding:2px 3px;border:0;background:transparent;color:#7c94a8;font-size:13px}
-  .meal-repas-sur-place .order-select{background:#f4fff8;border-color:#a9ddbc}
+  /* Couleurs des types de repas : le repas sur place reprend exactement la couleur du lieu. */
+  .g-rdc .meal-repas-sur-place .order-select,.template-group-rdc.meal-repas-sur-place .order-select{background:var(--rdc);border-color:#7fcf93;color:#17324a}
+  .g-floor .meal-repas-sur-place .order-select,.template-group-floor.meal-repas-sur-place .order-select{background:var(--floor);border-color:#77bbea;color:#17324a}
+  .g-pro .meal-repas-sur-place .order-select,.template-group-pro.meal-repas-sur-place .order-select{background:var(--pro);border-color:#b79be0;color:#35118c}
+  .g-guest .meal-repas-sur-place .order-select,.template-group-guest.meal-repas-sur-place .order-select{background:var(--guest);border-color:#ef9fc4;color:#6e2047}
   .meal-absent .order-select{background:#fff;border-color:#b9cfe0;color:#17324a}
-  .meal-plateau .order-select{background:#fff3d6;border-color:#e7c66d;color:#725100}
-  .meal-container .order-select{background:#eee9ff;border-color:#c0a9ec;color:#53309a}
-  .meal-pique-nique .order-select{background:#fff6cc;border-color:#ebcb52;color:#765500}
+  .meal-plateau .order-select{background:var(--tray);border-color:#e7b166;color:#725100}
+  .meal-container .order-select{background:var(--container);border-color:#69cdb4;color:#155d52}
+  .meal-pique-nique .order-select{background:var(--picnic);border-color:#dfbf4e;color:#765500}
   .closed-cell{background:#ffe5e5!important}
   .extra-row{background:#fafcff;border:1px dashed #c9d9e4;border-radius:5px;padding:4px;gap:4px}
   .note-input{height:31px;width:100%;min-width:0}
@@ -208,3 +212,50 @@
 .day-cell.meal-absent{background:#fff!important}
 .meal-absent .order-select{background:#fff!important;color:#17324a!important;border-color:#b9cfe0!important}
 .order-select option{background:#fff;color:#17324a}
+
+/* V10: pas de tuiles de synthèse sur l’écran principal */
+#dashboard,.dashboard{display:none!important}
+/* Menus de la semaine habituelle : lisibles et visibles sur fond blanc */
+#tab-modele .order-select{background:#fff!important;color:#17324a!important;border:1px solid #b9c9d7!important;border-radius:7px!important;padding:7px 28px 7px 9px!important;min-height:34px!important}
+#tab-modele .day-cell{background:#fff!important}
+#tab-modele .template-table td{background:#fff}
+/* Confirmation d’enregistrement */
+.save-week-ok{background:#edf8f0;border:1px solid #b9ddc1;border-radius:999px;padding:6px 10px;color:#238443!important}
+
+/* V11 — cohérence stricte écran/print et semaine habituelle. */
+.template-table tr.template-rdc td.sticky-group{background:var(--rdc);font-weight:700}
+.template-table tr.template-floor td.sticky-group{background:var(--floor);font-weight:700}
+.template-table tr.template-pro td.sticky-group{background:var(--pro);font-weight:700;color:#35118c}
+.template-table tr.template-guest td.sticky-group{background:var(--guest);font-weight:700}
+/* Les cellules restent blanches ; seule la sélection porte la couleur du type de repas. */
+.template-table .day-cell{background:#fff}
+
+
+/* V12 — ajustements du 14/09/2026 */
+#futureWeeks{min-width:260px;min-height:52px;padding:9px 16px!important;white-space:normal!important;line-height:1.2!important;display:flex;align-items:center;justify-content:center;text-align:center}
+/* Container : gris dans tous les menus de sélection à l'écran. */
+.meal-container .order-select,
+.g-rdc .meal-container .order-select,
+.g-floor .meal-container .order-select,
+.g-pro .meal-container .order-select,
+.g-guest .meal-container .order-select,
+.template-group-rdc.meal-container .order-select,
+.template-group-floor.meal-container .order-select,
+.template-group-pro.meal-container .order-select,
+.template-group-guest.meal-container .order-select{background:#eceff2!important;border-color:#aeb7c0!important;color:#374151!important}
+/* Semaine habituelle : les couleurs du type sélectionné restent visibles. */
+#tab-modele .meal-repas-sur-place.template-group-rdc .order-select{background:var(--rdc)!important;border-color:#7fcf93!important}
+#tab-modele .meal-repas-sur-place.template-group-floor .order-select{background:var(--floor)!important;border-color:#77bbea!important}
+#tab-modele .meal-repas-sur-place.template-group-pro .order-select{background:var(--pro)!important;border-color:#b79be0!important;color:#35118c!important}
+#tab-modele .meal-plateau .order-select{background:var(--tray)!important;border-color:#e7b166!important;color:#725100!important}
+#tab-modele .meal-container .order-select{background:#eceff2!important;border-color:#aeb7c0!important;color:#374151!important}
+#tab-modele .meal-pique-nique .order-select{background:var(--picnic)!important;border-color:#dfbf4e!important;color:#765500!important}
+#tab-modele .meal-absent .order-select{background:#fff!important;border-color:#b9cfe0!important;color:#17324a!important}
+.group-tools{display:flex!important;align-items:center;gap:14px;margin-left:auto;font-size:12px!important}
+.group-tools label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700}
+.group-tools select{height:29px;min-width:105px;margin:0;padding:2px 24px 2px 7px;border:1px solid #94b4c7;border-radius:6px;background:#fff;color:#17324a;font-size:11px}
+.group-tools b{font-size:13px}
+.list-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:0 0 12px;padding:10px 12px;background:#f3f8fc;border:1px solid #d3e3ee;border-radius:8px}
+.list-controls label{min-width:150px;font-size:12px;font-weight:700;color:#173b62}
+.list-controls select{margin-top:4px;height:36px;background:#fff}
+.template-controls{position:sticky;left:0;z-index:5;max-width:760px}
