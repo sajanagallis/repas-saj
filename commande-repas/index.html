@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Commande repas — SAJ Anagallis</title>
-  <link rel="stylesheet" href="style.css?v=31">
+  <link rel="stylesheet" href="style.css?v=33">
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <!-- Utilisés uniquement pour créer le PDF joint au brouillon Outlook. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -130,7 +130,7 @@
       </div>
     </section>
 
-    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine habituelle :</b> chaque nouvelle semaine est créée à partir de cette base. Le bouton d’enregistrement applique également le modèle à la semaine actuellement affichée tant qu’elle est « À préparer ». Une semaine « Commandée » ou « Archivée » n’est jamais écrasée.</p><p><b>Semaines futures :</b> utilisez les flèches ou le calendrier pour ouvrir directement la semaine voulue. Une semaine inexistante est créée à partir de la semaine habituelle lorsque vous commencez à la préparer.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
+    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine habituelle :</b> chaque nouvelle semaine est créée à partir de cette base. Le bouton d’enregistrement applique également le modèle à la semaine actuellement affichée tant qu’elle est « À préparer ». Une semaine « Commandée » ou « Archivée » n’est jamais écrasée.</p><p><b>Semaines futures :</b> utilisez les flèches ou le calendrier pour ouvrir directement la semaine voulue. Une semaine inexistante est créée à partir de la semaine habituelle lorsque vous commencez à la préparer.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 portrait sur une seule page. Le détail adapte sa densité au nombre de personnes.</p></div></section>
   </main>
 
   <div id="toast" class="toast no-print" hidden></div>
@@ -210,6 +210,6 @@
     <div class="dialog-actions"><button value="cancel">Annuler</button><button id="createDraft" value="default" class="primary">Créer le brouillon Outlook</button></div>
   </form></dialog>
 
-  <script src="script.js?v=31"></script>
+  <script src="script.js?v=33"></script>
 </body>
 </html>

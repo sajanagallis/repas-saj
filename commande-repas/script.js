@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V27 (14/09/2026) — reconstruction propre de la persistance : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V33 (15/09/2026) — reconstruction propre de la persistance : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -30,8 +30,9 @@ grist.ready({requiredAccess:'full'});
 init();
 
 async function init(){
-  bindUI(); fillStaticSelects();
   try{
+    bindUI();
+    fillStaticSelects();
     await ensureTables();
     await loadAll();
     await ensureSchemaUpgrades();
@@ -47,12 +48,26 @@ async function init(){
     await syncTemplateFromConfig();
     await loadAll();
     await ensureWeek(weekStart);
+    await reconcileLegacyWeekStatuses();
     await archivePastWeeks();
     await loadAll();
     const currentKey=weekKey(weekStart);
     if(!weeks.some(w=>w.SemaineKey===currentKey)) weekStart=mondayOf(new Date());
     renderAll();
-  }catch(err){console.error(err); toast('Erreur : '+(err.message||err));}
+  }catch(err){
+    console.error(err);
+    showFatalInitError(err);
+  }
+}
+
+function showFatalInitError(err){
+  const message=String(err?.message||err||'Erreur inconnue');
+  const target=document.getElementById('editor')||document.querySelector('.app')||document.body;
+  const box=document.createElement('div');
+  box.className='fatal-init-error';
+  box.innerHTML=`<strong>Le widget n’a pas pu terminer son chargement.</strong><br><span>${esc(message)}</span>`;
+  if(target===document.body) document.body.prepend(box); else target.prepend(box);
+  try{toast('Erreur de chargement : '+message)}catch(_e){}
 }
 
 async function ensureTables(){
@@ -211,31 +226,58 @@ async function createWeekRows(key){
 function commandRecord(p,key,day,type){const monday=parseKey(key),date=addDays(monday,dayIndex(day));return{SemaineKey:key,PersonKey:p.PersonKey,SourceType:p.SourceType||'Manuel',SourceId:+p.SourceId||0,Nom:p.Nom||'',Prenom:p.Prenom||'',Groupe:p.Groupe||'RDC',Regime:p.Regime||'Normal',Texture:p.Texture||'Normale',Jour:day,DateJour:gristDate(date),Annee:monday.getFullYear(),TypeCommande:type,HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:''}}
 function activePeopleForWeek(monday){const friday=addDays(monday,4);return config.filter(p=>{const start=configDate(p,'start'),end=configDate(p,'end');return p.Actif!==false&&(!start||start<=friday)&&(!end||end>=monday)})}
 
-async function archivePastWeeks(){
-  // Certaines anciennes versions de la table Repas_Semaines peuvent refuser la valeur
-  // « Archivée ». Une erreur d'archivage ne doit jamais bloquer tout le widget.
-  const today=mondayOf(new Date());
+async function reconcileLegacyWeekStatuses(){
+  // V33 — réparation des statuts hérités des anciennes versions.
+  // Un ancien bug pouvait archiver la semaine EN COURS dès qu'elle avait commencé.
+  // On ne considère désormais comme archivée que toute semaine strictement antérieure
+  // au lundi de la semaine courante. Une semaine courante/future marquée « Archivée »
+  // par erreur est restaurée sans toucher à son contenu :
+  // - « Commandée » si elle a déjà été envoyée ;
+  // - « À préparer » sinon.
+  const currentMonday=mondayOf(new Date());
+  const actions=[];
   for(const w of weeks){
     const d=parseKey(w.SemaineKey);
-    if(!isValidDate(d)||d>=today||norm(w.Statut).includes('archiv'))continue;
+    if(!isValidDate(d)||d<currentMonday||!norm(w.Statut).includes('archiv'))continue;
+    const ordered=!!(w.CommandeeLeDT||w.CommandeeLe);
+    const restored=ordered?'Commandée':'À préparer';
+    actions.push(['UpdateRecord',TABLES.weeks,w.id,{Statut:restored}]);
+    w.Statut=restored;
+  }
+  if(actions.length){
+    await grist.docApi.applyUserActions(actions);
+    console.info(`V33 : ${actions.length} statut(s) de semaine courante/future réparé(s).`);
+  }
+}
+async function archivePastWeeks(){
+  // Une semaine n'est archivée qu'à partir du lundi suivant.
+  // La semaine en cours reste donc modifiable du lundi au vendredi (et le week-end
+  // jusqu'au changement de semaine), y compris si une commande a déjà été envoyée.
+  const currentMonday=mondayOf(new Date());
+  for(const w of weeks){
+    const d=parseKey(w.SemaineKey);
+    if(!isValidDate(d)||d>=currentMonday||norm(w.Statut).includes('archiv'))continue;
     try{
       await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{Statut:'Archivée'}]]);
       w.Statut='Archivée';
     }catch(err){
       console.warn('Archivage automatique non écrit dans Grist pour',w.SemaineKey,err);
-      // Le statut « Archivée » sera tout de même calculé visuellement d'après la date.
     }
   }
 }
 function isWeekArchived(w){
   if(!w)return false;
-  if(norm(w.Statut).includes('archiv'))return true;
   const d=parseKey(w.SemaineKey);
-  return isValidDate(d)&&d<mondayOf(new Date());
+  if(isValidDate(d))return d<mondayOf(new Date());
+  // Repli uniquement si la date est inexploitable.
+  return norm(w.Statut).includes('archiv');
 }
 function effectiveWeekStatus(w){
   if(!w)return 'À préparer';
-  return isWeekArchived(w)?'Archivée':(w.Statut||'À préparer');
+  if(isWeekArchived(w))return 'Archivée';
+  // Ignore un éventuel ancien statut « Archivée » sur une semaine courante/future.
+  if(norm(w.Statut).includes('archiv'))return (w.CommandeeLeDT||w.CommandeeLe)?'Commandée':'À préparer';
+  return w.Statut||((w.CommandeeLeDT||w.CommandeeLe)?'Commandée':'À préparer');
 }
 
 function renderAll(){renderWeekNavigation();renderCommande();renderHistory();renderSettings();renderTemplateEditor();renderEmailSettings();renderLogo();}
@@ -361,9 +403,9 @@ function summaryGroup(group,band,totalClass,c){
   const title=group==='Professionnel'?'PROFESSIONNELS':group;
 
   const profileKey=x=>{
-    const diet=normalizeDiet(x.Regime||'Normal');
+    const diet=canonicalDiet(x.Regime||'Normal')||'Normal';
     if(group==='Professionnel') return `D|${diet}`;
-    const texture=normalizeTexture(x.Texture||'Normale');
+    const texture=canonicalTexture(x.Texture||'Normale')||'Normale';
     return `P|${diet}|${texture}`;
   };
   const profileLabel=key=>{
@@ -777,8 +819,10 @@ async function applyTemplateToSelectedWeek(snapshot=null){
   let w=weeks.find(x=>x.SemaineKey===key);
   if(!w){await ensureWeek(weekStart);await loadAll();w=weeks.find(x=>x.SemaineKey===key)}
   if(!w)return {updated:0,added:0,removedDuplicates:0,skipped:'missing'};
-  if(isWeekArchived(w))return {updated:0,added:0,removedDuplicates:0,skipped:'archived'};
-  if(effectiveWeekStatus(w)==='Commandée')return {updated:0,added:0,removedDuplicates:0,skipped:'ordered'};
+  if(isWeekArchived(w))return {updated:0,added:0,removedDuplicates:0,skipped:'archived',rectificative:false};
+  // Une semaine déjà commandée reste modifiable : toute modification devient une rectificative,
+  // exactement comme une modification faite directement dans la commande principale.
+  const wasOrdered=effectiveWeekStatus(w)==='Commandée'||!!(w.CommandeeLeDT||w.CommandeeLe);
 
   const model=snapshot||templateSnapshotFromRecords();
   const modelMap=new Map(model.map(x=>[`${x.PersonKey}|${x.Jour}`,x]));
@@ -808,12 +852,14 @@ async function applyTemplateToSelectedWeek(snapshot=null){
   if(actions.length)await grist.docApi.applyUserActions(actions);
   if(actions.length){
     const now=new Date();
-    await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false}]]);
+    const weekFields={ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false};
+    if(wasOrdered)weekFields.Rectificative=true;
+    await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,weekFields]]);
     await logAudit({week:key,action:'Application semaine habituelle',detail:`Semaine habituelle appliquée : ${updated} mise(s) à jour, ${added} ajout(s), ${removedDuplicates} doublon(s) supprimé(s)`});
   }
   await loadAll();
   verifyWeekMatchesTemplate(key,model);
-  return {updated,added,removedDuplicates,skipped:null};
+  return {updated,added,removedDuplicates,skipped:null,rectificative:wasOrdered};
 }
 
 async function saveTemplateExplicitly(){
@@ -832,8 +878,8 @@ async function saveTemplateExplicitly(){
     const sync=await applyTemplateToSelectedWeek(snapshot);
     await loadAll();
     renderAll();
-    if(sync.skipped==='ordered')toast('Semaine habituelle enregistrée. La commande affichée est déjà « Commandée » : elle n’a pas été écrasée.');
-    else if(sync.skipped==='archived')toast('Semaine habituelle enregistrée. La semaine affichée est archivée : elle n’a pas été écrasée.');
+    if(sync.skipped==='archived')toast('Semaine habituelle enregistrée. La semaine affichée est réellement passée et archivée : elle n’a pas été modifiée.');
+    else if(sync.rectificative)toast(`Semaine habituelle enregistrée et appliquée à la commande (${result.saved} cases). La commande avait déjà été envoyée : elle est marquée rectificative.`);
     else toast(`Semaine habituelle enregistrée et appliquée à la commande (${result.saved} cases).`);
   }catch(err){
     console.error('Enregistrement semaine habituelle',err);
