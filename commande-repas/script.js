@@ -1,5 +1,5 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V26 (14/09/2026) : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
+   Version V27 (14/09/2026) — reconstruction propre de la persistance : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
    rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
    impressions 2 pages, PDF, brouillon Outlook via Power Automate.
 */
@@ -19,6 +19,7 @@ let weekStart=mondayOf(new Date());
 let sourceUsers=[],sourcePros=[],config=[],templateRows=[],weeks=[],commands=[],guests=[],closures=[],settings=[],audit=[];
 let repartitions=[],rooms=[];
 let saveTimer=null;
+let lastVisibleOrderSnapshot=[];
 let archiveEditUnlocked=false;
 let screenGroupSort={RDC:'name','1er étage':'name',Professionnel:'name','Stagiaire / Visiteur':'name'};
 let templateGroupSort={RDC:'name','1er étage':'name',Professionnel:'name'};
@@ -580,8 +581,7 @@ function renderTemplateEditor(){
   }).join('');
   root.innerHTML=html;
   document.querySelectorAll('[data-template-group-sort]').forEach(x=>x.onchange=e=>{templateGroupSort[e.target.dataset.templateGroupSort]=e.target.value;renderTemplateEditor()});
-  document.querySelectorAll('[data-template-id]').forEach(s=>s.onchange=saveTemplateType);
-  document.querySelectorAll('[data-template-new]').forEach(s=>s.onchange=createTemplateType);
+  document.querySelectorAll('#templateSettings select[data-person-key][data-template-day]').forEach(s=>s.onchange=onTemplateTypeDraftChange);
   document.querySelectorAll('[data-template-time]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-bread]').forEach(x=>x.onchange=saveTemplateExtra);
   document.querySelectorAll('[data-template-picnic]').forEach(x=>x.onchange=saveTemplateExtra);
@@ -593,24 +593,18 @@ function renderTemplateEditor(){
 }
 function templateDayCell(row,p,d){
   const type=row?.TypeCommande || (p[d.key]?'Repas sur place':'Absent');
-  const mealClass='meal-'+norm(type).replace(/[^a-z0-9]+/g,'-');
+  const mealClass=mealClassFor(type);
   const groupClass=p.Groupe==='RDC'?'template-group-rdc':p.Groupe==='1er étage'?'template-group-floor':p.Groupe==='Professionnel'?'template-group-pro':'template-group-guest';
-  if(!row){
-    return `<td class="day-cell ${mealClass} ${groupClass}"><select class="order-select" data-template-new="1" data-person-key="${esc(p.PersonKey)}" data-template-day="${d.key}">${TYPES.map(t=>`<option value="${esc(t)}" ${type===t?'selected':''}>${t}</option>`).join('')}</select></td>`;
-  }
-  return `<td class="day-cell ${mealClass} ${groupClass}"><select class="order-select" data-template-id="${row.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${type===t?'selected':''}>${t}</option>`).join('')}</select>${templateExtrasHtml(row)}</td>`
+  const rid=row?.id||'';
+  return `<td class="day-cell ${mealClass} ${groupClass}" data-template-cell="${esc(p.PersonKey)}|${d.key}">
+    <select class="order-select" data-template-id="${rid}" data-person-key="${esc(p.PersonKey)}" data-template-day="${d.key}">${TYPES.map(t=>`<option value="${esc(t)}" ${type===t?'selected':''}>${t}</option>`).join('')}</select>
+    ${templateDraftExtrasHtml(p.PersonKey,d.key,type,row)}
+  </td>`;
 }
-async function createTemplateType(e){
-  const personKey=e.target.dataset.personKey, day=e.target.dataset.templateDay, type=e.target.value;
-  if(!personKey||!day)return;
-  const fields={PersonKey:personKey,Jour:day,TypeCommande:type,HeureRetrait:'',Pain:type==='Pique-nique'?'Pain':'',OptionPique:'',NoteCuisine:''};
-  await grist.docApi.applyUserActions([['AddRecord',TABLES.template,null,fields]]);
-  await saveSetting('templateLastSaved',new Date().toISOString());
-  await loadAll();renderTemplateEditor();
+async function saveTemplateExtra(e){
+  // Les options restent dans le formulaire jusqu'au clic sur « Enregistrer la semaine habituelle ».
+  markTemplateDirty();
 }
-function templateExtrasHtml(r){if(!['Plateau','Container','Pique-nique'].includes(r.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-template-time="${r.id}" value="${esc(r.HeureRetrait||'')}">`;if(r.TypeCommande==='Pique-nique')s+=`<select data-template-bread="${r.id}"><option ${r.Pain==='Pain'?'selected':''}>Pain</option><option ${r.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-template-picnic="${r.id}"><option value="" ${!r.OptionPique?'selected':''}>Standard</option><option ${r.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${r.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
-async function saveTemplateType(e){const id=+e.target.dataset.templateId;const row=templateRows.find(x=>+x.id===id);if(!row)return;const type=e.target.value;const fields={TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(row.OptionPique||''):''};await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,fields]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateEditor();toast('Semaine habituelle mise à jour. Cliquez sur « Enregistrer la semaine habituelle » pour l’appliquer à la commande affichée.');}
-async function saveTemplateExtra(e){const id=+(e.target.dataset.templateTime||e.target.dataset.templateBread||e.target.dataset.templatePicnic);const field=e.target.dataset.templateTime?'HeureRetrait':e.target.dataset.templateBread?'Pain':'OptionPique';await grist.docApi.applyUserActions([['UpdateRecord',TABLES.template,id,{[field]:e.target.value}]]);await saveSetting('templateLastSaved',new Date().toISOString());await loadAll();renderTemplateMeta();toast('Semaine habituelle enregistrée.');}
 
 function renderTemplateMeta(){
   const el=$('templateMeta');if(!el)return;
@@ -620,37 +614,79 @@ function renderTemplateMeta(){
   const lastText=last?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date(last)):'jamais';
   el.innerHTML=`<span><b>${people.length}</b> personne${people.length>1?'s':''} active${people.length>1?'s':''}</span><span><b>${mealCount}</b> repas habituels sur la semaine</span><span>Dernier enregistrement : <b>${esc(lastText)}</b></span>`;
 }
-async function flushVisibleTemplateSelections(){
-  const actions=[];
-  const seen=new Set();
-  document.querySelectorAll('#templateSettings select[data-template-id]').forEach(sel=>{
-    const id=+sel.dataset.templateId;
-    const row=templateRows.find(x=>+x.id===id);
-    if(!row)return;
-    seen.add(`${row.PersonKey}|${row.Jour}`);
+
+
+function mealClassFor(type){return 'meal-'+norm(type).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')}
+function markTemplateDirty(){const meta=$('templateMeta');if(meta)meta.dataset.dirty='1'}
+function onTemplateTypeDraftChange(e){
+  const sel=e.target;const td=sel.closest('td');if(!td)return;
+  [...td.classList].filter(c=>c.startsWith('meal-')).forEach(c=>td.classList.remove(c));td.classList.add(mealClassFor(sel.value));
+  td.querySelectorAll('.extra-row').forEach(x=>x.remove());
+  const personKey=sel.dataset.personKey,day=sel.dataset.templateDay;
+  const previous=templateFor(personKey,day)||{};
+  td.insertAdjacentHTML('beforeend',templateDraftExtrasHtml(personKey,day,sel.value,previous));
+  td.querySelectorAll('[data-template-time],[data-template-bread],[data-template-picnic]').forEach(x=>x.onchange=saveTemplateExtra);
+  markTemplateDirty();
+}
+function templateDraftExtrasHtml(personKey,day,type,row={}){
+  if(!['Plateau','Container','Pique-nique'].includes(type))return '';
+  let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-template-time="1" value="${esc(row.HeureRetrait||'')}">`;
+  if(type==='Pique-nique')s+=`<select data-template-bread="1"><option ${row.Pain==='Pain de mie'?'':'selected'}>Pain</option><option ${row.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-template-picnic="1"><option value="" ${!row.OptionPique?'selected':''}>Standard</option><option ${row.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${row.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;
+  return s+'</div>';
+}
+function collectTemplateSnapshotFromDom(){
+  const out=[];
+  document.querySelectorAll('#templateSettings select[data-person-key][data-template-day]').forEach(sel=>{
+    const td=sel.closest('td');
     const type=sel.value;
-    const fields={
-      TypeCommande:type,
-      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',
-      Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',
-      OptionPique:type==='Pique-nique'?(row.OptionPique||''):''
-    };
-    const same=templateRows.filter(x=>x.PersonKey===row.PersonKey&&x.Jour===row.Jour);
-    (same.length?same:[row]).forEach(r=>actions.push(['UpdateRecord',TABLES.template,r.id,fields]));
+    out.push({
+      PersonKey:sel.dataset.personKey,Jour:sel.dataset.templateDay,TypeCommande:type,
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(td?.querySelector('[data-template-time]')?.value||''):'',
+      Pain:type==='Pique-nique'?(td?.querySelector('[data-template-bread]')?.value||'Pain'):'',
+      OptionPique:type==='Pique-nique'?(td?.querySelector('[data-template-picnic]')?.value||''):'',
+      NoteCuisine:''
+    });
   });
-  document.querySelectorAll('#templateSettings select[data-template-new]').forEach(sel=>{
-    const personKey=sel.dataset.personKey,day=sel.dataset.templateDay;
-    if(!personKey||!day)return;
-    const composite=`${personKey}|${day}`;
-    if(seen.has(composite))return;
-    actions.push(['AddRecord',TABLES.template,null,{PersonKey:personKey,Jour:day,TypeCommande:sel.value,HeureRetrait:'',Pain:sel.value==='Pique-nique'?'Pain':'',OptionPique:'',NoteCuisine:''}]);
-    seen.add(composite);
-  });
+  const expected=config.filter(p=>p.Actif!==false).length*DAYS.length;
+  if(out.length!==expected)throw new Error(`Semaine habituelle incomplète : ${out.length} cases visibles au lieu de ${expected}.`);
+  return out;
+}
+function templateSnapshotFromRecords(){
+  const map=new Map();
+  [...templateRows].sort((a,b)=>(+a.id||0)-(+b.id||0)).forEach(r=>map.set(`${r.PersonKey}|${r.Jour}`,{PersonKey:r.PersonKey,Jour:r.Jour,TypeCommande:r.TypeCommande||'Absent',HeureRetrait:r.HeureRetrait||'',Pain:r.Pain||'',OptionPique:r.OptionPique||'',NoteCuisine:r.NoteCuisine||''}));
+  return [...map.values()];
+}
+async function persistTemplateSnapshot(snapshot){
+  const existing=new Map();
+  templateRows.forEach(r=>{const k=`${r.PersonKey}|${r.Jour}`;if(!existing.has(k))existing.set(k,[]);existing.get(k).push(r)});
+  const actions=[];let saved=0,removed=0;
+  for(const row of snapshot){
+    const k=`${row.PersonKey}|${row.Jour}`;const matches=(existing.get(k)||[]).sort((a,b)=>(+b.id||0)-(+a.id||0));
+    const fields={PersonKey:row.PersonKey,Jour:row.Jour,TypeCommande:row.TypeCommande,HeureRetrait:row.HeureRetrait||'',Pain:row.Pain||'',OptionPique:row.OptionPique||'',NoteCuisine:row.NoteCuisine||''};
+    if(matches.length){actions.push(['UpdateRecord',TABLES.template,matches[0].id,fields]);for(const d of matches.slice(1)){actions.push(['RemoveRecord',TABLES.template,d.id]);removed++}}
+    else actions.push(['AddRecord',TABLES.template,null,fields]);
+    saved++;
+  }
   if(actions.length)await grist.docApi.applyUserActions(actions);
-  return actions.length;
+  return {changed:actions.length,saved,removed};
+}
+function verifyTemplateMatchesSnapshot(snapshot){
+  const actual=new Map();
+  [...templateRows].sort((a,b)=>(+a.id||0)-(+b.id||0)).forEach(r=>actual.set(`${r.PersonKey}|${r.Jour}`,r));
+  for(const s of snapshot){const a=actual.get(`${s.PersonKey}|${s.Jour}`);if(!a||a.TypeCommande!==s.TypeCommande||String(a.HeureRetrait||'')!==String(s.HeureRetrait||'')||String(a.Pain||'')!==String(s.Pain||'')||String(a.OptionPique||'')!==String(s.OptionPique||''))throw new Error(`Contrôle d’enregistrement échoué pour ${s.PersonKey} ${s.Jour}.`)}
+}
+function verifyWeekMatchesTemplate(key,snapshot){
+  const expected=new Map(snapshot.map(x=>[`${x.PersonKey}|${x.Jour}`,x]));
+  const monday=parseKey(key);
+  for(const p of activePeopleForWeek(monday))for(const d of DAYS){
+    const a=commands.filter(c=>c.SemaineKey===key&&c.PersonKey===p.PersonKey&&c.Jour===d.key).sort((x,y)=>(+y.id||0)-(+x.id||0))[0];
+    const t=expected.get(`${p.PersonKey}|${d.key}`);if(!a||!t)throw new Error(`Commande incomplète pour ${p.Nom} ${p.Prenom} ${d.label}.`);
+    const expectedType=closureFor(addDays(monday,d.offset))?'Fermé':t.TypeCommande;
+    if(a.TypeCommande!==expectedType)throw new Error(`Commande non synchronisée pour ${p.Nom} ${p.Prenom} ${d.label} : ${a.TypeCommande} au lieu de ${expectedType}.`);
+  }
 }
 
-async function applyTemplateToSelectedWeek(){
+async function applyTemplateToSelectedWeek(snapshot=null){
   const key=weekKey(weekStart);
   let w=weeks.find(x=>x.SemaineKey===key);
   if(!w){await ensureWeek(weekStart);await loadAll();w=weeks.find(x=>x.SemaineKey===key)}
@@ -658,38 +694,39 @@ async function applyTemplateToSelectedWeek(){
   if(isWeekArchived(w))return {updated:0,added:0,removedDuplicates:0,skipped:'archived'};
   if(effectiveWeekStatus(w)==='Commandée')return {updated:0,added:0,removedDuplicates:0,skipped:'ordered'};
 
+  const model=snapshot||templateSnapshotFromRecords();
+  const modelMap=new Map(model.map(x=>[`${x.PersonKey}|${x.Jour}`,x]));
   const monday=parseKey(key);
   const people=activePeopleForWeek(monday);
   const actions=[];
   let updated=0,added=0,removedDuplicates=0;
+
   for(const person of people){
     for(const d of DAYS){
-      const date=addDays(monday,d.offset);
-      const closed=closureFor(date);
-      const desired=templateCommandRecord(person,key,d.key);
-      if(closed){desired.TypeCommande='Fermé';desired.HeureRetrait='';desired.Pain='';desired.OptionPique=''}
-      const matches=commands
-        .filter(c=>c.SemaineKey===key&&c.PersonKey===person.PersonKey&&c.Jour===d.key)
-        .sort((a,b)=>(+b.id||0)-(+a.id||0));
-      const fields={
-        SourceType:desired.SourceType,SourceId:desired.SourceId,Nom:desired.Nom,Prenom:desired.Prenom,
-        Groupe:desired.Groupe,Regime:desired.Regime,Texture:desired.Texture,DateJour:desired.DateJour,Annee:desired.Annee,
-        TypeCommande:desired.TypeCommande,HeureRetrait:desired.HeureRetrait||'',Pain:desired.Pain||'',OptionPique:desired.OptionPique||'',NoteCuisine:desired.NoteCuisine||''
+      const t=modelMap.get(`${person.PersonKey}|${d.key}`)||{
+        PersonKey:person.PersonKey,Jour:d.key,TypeCommande:person[d.key]?'Repas sur place':'Absent',HeureRetrait:'',Pain:'',OptionPique:''
       };
-      if(matches.length){
-        actions.push(['UpdateRecord',TABLES.cmd,matches[0].id,fields]);updated++;
-        for(const duplicate of matches.slice(1)){actions.push(['RemoveRecord',TABLES.cmd,duplicate.id]);removedDuplicates++;}
-      }else{
-        actions.push(['AddRecord',TABLES.cmd,null,desired]);added++;
-      }
+      const desired=commandRecord(person,key,d.key,t.TypeCommande||'Absent');
+      desired.HeureRetrait=t.HeureRetrait||'';
+      desired.Pain=(t.TypeCommande==='Pique-nique')?(t.Pain||'Pain'):'';
+      desired.OptionPique=(t.TypeCommande==='Pique-nique')?(t.OptionPique||''):'';
+      desired.NoteCuisine=t.NoteCuisine||'';
+      if(closureFor(addDays(monday,d.offset))){desired.TypeCommande='Fermé';desired.HeureRetrait='';desired.Pain='';desired.OptionPique=''}
+
+      const matches=commands.filter(c=>c.SemaineKey===key&&c.PersonKey===person.PersonKey&&c.Jour===d.key).sort((a,b)=>(+b.id||0)-(+a.id||0));
+      const fields={SourceType:desired.SourceType,SourceId:desired.SourceId,Nom:desired.Nom,Prenom:desired.Prenom,Groupe:desired.Groupe,Regime:desired.Regime,Texture:desired.Texture,DateJour:desired.DateJour,Annee:desired.Annee,TypeCommande:desired.TypeCommande,HeureRetrait:desired.HeureRetrait||'',Pain:desired.Pain||'',OptionPique:desired.OptionPique||'',NoteCuisine:desired.NoteCuisine||''};
+      if(matches.length){actions.push(['UpdateRecord',TABLES.cmd,matches[0].id,fields]);updated++;for(const dupe of matches.slice(1)){actions.push(['RemoveRecord',TABLES.cmd,dupe.id]);removedDuplicates++}}
+      else{actions.push(['AddRecord',TABLES.cmd,null,desired]);added++}
     }
   }
   if(actions.length)await grist.docApi.applyUserActions(actions);
   if(actions.length){
     const now=new Date();
     await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{ModifieLe:now.toISOString(),ModifieLeDT:gristDateTime(now),ControleOK:false}]]);
-    await logAudit({week:key,action:'Application semaine habituelle',detail:`Semaine habituelle appliquée à la commande : ${updated} mise(s) à jour, ${added} ajout(s), ${removedDuplicates} doublon(s) supprimé(s)`});
+    await logAudit({week:key,action:'Application semaine habituelle',detail:`Semaine habituelle appliquée : ${updated} mise(s) à jour, ${added} ajout(s), ${removedDuplicates} doublon(s) supprimé(s)`});
   }
+  await loadAll();
+  verifyWeekMatchesTemplate(key,model);
   return {updated,added,removedDuplicates,skipped:null};
 }
 
@@ -697,25 +734,25 @@ async function saveTemplateExplicitly(){
   const btn=$('saveTemplateBtn');if(!btn)return;
   btn.disabled=true;btn.textContent='Enregistrement…';
   try{
-    // 1) Enregistrer réellement toutes les valeurs visibles de la semaine habituelle.
-    await flushVisibleTemplateSelections();
+    // La valeur affichée dans chaque case est la seule source de vérité au moment du clic.
+    const snapshot=collectTemplateSnapshotFromDom();
+    const result=await persistTemplateSnapshot(snapshot);
     await saveSetting('templateLastSaved',new Date().toISOString());
     await loadAll();
+    verifyTemplateMatchesSnapshot(snapshot);
 
-    // 2) Appliquer explicitement la semaine habituelle à la commande actuellement affichée.
-    // Les semaines historiques et les semaines déjà commandées ne sont jamais écrasées.
-    const sync=await applyTemplateToSelectedWeek();
+    // Revirement validé aujourd'hui : la semaine habituelle doit aussi alimenter
+    // immédiatement la commande actuellement affichée tant qu'elle est modifiable.
+    const sync=await applyTemplateToSelectedWeek(snapshot);
     await loadAll();
     renderAll();
-    if(sync.skipped==='ordered')toast('Semaine habituelle enregistrée. La commande affichée est déjà « Commandée » et n’a pas été écrasée.');
-    else if(sync.skipped==='archived')toast('Semaine habituelle enregistrée. Une semaine archivée ne peut pas être modifiée.');
-    else toast('Semaine habituelle enregistrée et appliquée à la commande affichée.');
+    if(sync.skipped==='ordered')toast('Semaine habituelle enregistrée. La commande affichée est déjà « Commandée » : elle n’a pas été écrasée.');
+    else if(sync.skipped==='archived')toast('Semaine habituelle enregistrée. La semaine affichée est archivée : elle n’a pas été écrasée.');
+    else toast(`Semaine habituelle enregistrée et appliquée à la commande (${result.saved} cases).`);
   }catch(err){
     console.error('Enregistrement semaine habituelle',err);
-    toast('Erreur pendant l’enregistrement de la semaine habituelle : '+(err.message||err));
-  }finally{
-    btn.disabled=false;btn.textContent='Enregistrer la semaine habituelle';
-  }
+    toast('Échec de l’enregistrement de la semaine habituelle : '+(err.message||err));
+  }finally{btn.disabled=false;btn.textContent='Enregistrer la semaine habituelle'}
 }
 
 function renderLogo(){
@@ -789,24 +826,30 @@ async function saveWeekStatus(){
   await loadAll();renderAll();showSavedState();
 }
 async function flushVisibleOrderSelections(){
-  const actions=[];
+  const actions=[];lastVisibleOrderSnapshot=[];
   document.querySelectorAll('#editor select[data-order-id]').forEach(sel=>{
-    const id=+sel.dataset.orderId;
-    const row=commands.find(x=>+x.id===id);
-    if(!row)return;
+    const id=+sel.dataset.orderId;const row=commands.find(x=>+x.id===id);if(!row)return;
     const type=sel.value;
-    if(type===row.TypeCommande)return;
+    const td=sel.closest('td');
     const fields={
       TypeCommande:type,
-      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(row.HeureRetrait||''):'',
-      Pain:type==='Pique-nique'?(row.Pain||'Pain'):'',
-      OptionPique:type==='Pique-nique'?(row.OptionPique||''):''
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(td?.querySelector('[data-time-id]')?.value||row.HeureRetrait||''):'',
+      Pain:type==='Pique-nique'?(td?.querySelector('[data-bread-id]')?.value||row.Pain||'Pain'):'',
+      OptionPique:type==='Pique-nique'?(td?.querySelector('[data-picnic-id]')?.value||row.OptionPique||''):''
     };
-    const siblings=commands.filter(x=>x.SemaineKey===row.SemaineKey&&x.PersonKey===row.PersonKey&&x.Jour===row.Jour);
-    (siblings.length?siblings:[row]).forEach(r=>actions.push(['UpdateRecord',TABLES.cmd,r.id,fields]));
+    lastVisibleOrderSnapshot.push({SemaineKey:row.SemaineKey,PersonKey:row.PersonKey,Jour:row.Jour,...fields});
+    const siblings=commands.filter(x=>x.SemaineKey===row.SemaineKey&&x.PersonKey===row.PersonKey&&x.Jour===row.Jour).sort((a,b)=>(+b.id||0)-(+a.id||0));
+    if(siblings.length){actions.push(['UpdateRecord',TABLES.cmd,siblings[0].id,fields]);for(const dupe of siblings.slice(1))actions.push(['RemoveRecord',TABLES.cmd,dupe.id])}
   });
   if(actions.length)await grist.docApi.applyUserActions(actions);
   return actions.length;
+}
+
+
+function verifyVisibleOrderSnapshot(){
+  if(!lastVisibleOrderSnapshot.length)return;
+  const map=new Map(currentCommands().map(r=>[`${r.PersonKey}|${r.Jour}`,r]));
+  for(const s of lastVisibleOrderSnapshot){const a=map.get(`${s.PersonKey}|${s.Jour}`);if(!a||a.TypeCommande!==s.TypeCommande)throw new Error(`Contrôle d’enregistrement échoué pour ${s.PersonKey} ${s.Jour}.`)}
 }
 
 async function saveCurrentWeekExplicitly(){
@@ -834,7 +877,9 @@ async function saveCurrentWeekExplicitly(){
       if(Object.keys(fields).length)await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,freshWeek.id,fields]]);
       await logAudit({action:'Enregistrement manuel',detail:'Commande enregistrée depuis le bouton Enregistrer'});
     }
-    await loadAll();renderAll();
+    await loadAll();
+    verifyVisibleOrderSnapshot();
+    renderAll();
     // Confirmation discrète uniquement dans la zone d'état : aucun bouton/pastille « Enregistré ».
     showSavedState();
   }catch(err){console.error(err);toast('Échec de l’enregistrement : '+err.message)}

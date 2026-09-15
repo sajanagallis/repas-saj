@@ -812,7 +812,7 @@
 }
 
 
-/* Interface consolidée */
+/* V27 — règles finales de lisibilité */
 @media screen {
   /* Séparation verticale franche entre identité et profil alimentaire. */
   #tab-commande .editor-group th:first-child,
@@ -850,10 +850,3 @@
 }
 
 
-/* Interface consolidée */
-select.profile-green, select.profile-red,
-#tab-commande select.profile-green, #tab-commande select.profile-red,
-#tab-modele select.profile-green, #tab-modele select.profile-red,
-.settings-table select.profile-green, .settings-table select.profile-red{
-  font-weight:400!important;
-}

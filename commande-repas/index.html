@@ -73,14 +73,14 @@
           <div>
             <span class="eyebrow">BASE DE PRÉ-REMPLISSAGE</span>
             <h2>Semaine habituelle</h2>
-            <p>Remplissez directement ici la semaine type. Toute nouvelle semaine sera créée à partir de cette base puis restera indépendante.</p>
+            <p>Remplissez ici la semaine type. Elle sert aux nouvelles semaines et, lors de son enregistrement, met aussi à jour la commande actuellement affichée si elle est encore « À préparer ».</p>
           </div>
           <div class="model-actions">
             <button id="saveTemplateBtn" class="save-week-btn" type="button">Enregistrer la semaine habituelle</button>
           </div>
         </div>
         <div class="model-info">
-          <b>Important :</b> les changements effectués ici ne modifient jamais les semaines déjà créées. Ils servent uniquement de base aux nouvelles semaines ou à une réinitialisation volontaire.
+          <b>Important :</b> « Enregistrer la semaine habituelle » enregistre toutes les cases puis les applique à la commande affichée si elle est modifiable. Les semaines « Commandée » et « Archivée » restent protégées.
         </div>
         <div id="templateMeta" class="model-meta"></div>
         <div id="templateSettings" class="template-settings"></div>
@@ -130,7 +130,7 @@
       </div>
     </section>
 
-    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine habituelle :</b> chaque nouvelle semaine est créée à partir de cette base. Une fois créée, elle devient indépendante et peut être modifiée sans changer le modèle ni les autres semaines.</p><p><b>Semaines futures :</b> utilisez les flèches ou le calendrier pour ouvrir directement la semaine voulue. Une semaine inexistante est créée à partir de la semaine habituelle lorsque vous commencez à la préparer.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
+    <section id="tab-aide" class="tab-panel"><div class="panel-card help"><h2>Aide rapide</h2><p><b>Semaine habituelle :</b> chaque nouvelle semaine est créée à partir de cette base. Le bouton d’enregistrement applique également le modèle à la semaine actuellement affichée tant qu’elle est « À préparer ». Une semaine « Commandée » ou « Archivée » n’est jamais écrasée.</p><p><b>Semaines futures :</b> utilisez les flèches ou le calendrier pour ouvrir directement la semaine voulue. Une semaine inexistante est créée à partir de la semaine habituelle lorsque vous commencez à la préparer.</p><p><b>Plateau / container / pique-nique :</b> choisir le type directement dans la case du jour. Pour un même jour, une personne ne peut être comptée qu'une fois : soit sur son étage, soit en plateau/container/pique-nique. Les blocs spéciaux n'apparaissent à l'impression que s'il y en a.</p><p><b>Contrôle :</b> « Vérifier la commande » recherche les repas incohérents, les retraits sans heure et les doublons avant l'envoi.</p><p><b>Rectificatif :</b> toute modification après une commande déjà marquée « Commandée » est signalée comme rectificative.</p><p><b>Vacances :</b> les jours fermés sont mis à zéro et portent la mention FERMÉ. La commande reste imprimable.</p><p><b>Impression :</b> page 1 = récapitulatif A4 portrait ; page 2 = détail A4 paysage. Le détail adapte sa densité au nombre de personnes.</p></div></section>
   </main>
 
   <div id="toast" class="toast no-print" hidden></div>
