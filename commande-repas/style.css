@@ -898,3 +898,28 @@
 .page-detail #detailScale{max-height:none!important;overflow:visible!important}
 #pdfCaptureHost .page-detail #detailScale{max-height:none!important;overflow:visible!important}
 @media print{.page-detail #detailScale{max-height:none!important;overflow:visible!important}}
+
+/* V40 — indicateur de version et diagnostics discrets */
+.version-badge{
+  flex:0 0 auto;
+  align-self:center;
+  padding:3px 7px;
+  border:1px solid #c9d5e1;
+  border-radius:999px;
+  background:#f5f8fb;
+  color:#5a6e80;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.04em;
+  white-space:nowrap;
+}
+.fatal-init-error{
+  margin:10px 0;
+  padding:12px 14px;
+  border:1px solid #d8a6a6;
+  border-left:4px solid #b43a3a;
+  border-radius:8px;
+  background:#fff6f6;
+  color:#7a1f1f;
+  line-height:1.4;
+}

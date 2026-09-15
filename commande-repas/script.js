@@ -1,10 +1,12 @@
 /* SAJ ANAGALLIS — WIDGET GRIST COMMANDES REPAS
-   Version V34 (15/09/2026) — reconstruction propre de la persistance : compatibilité archives renforcée, semaines indépendantes, contrôles, historique des modifications,
-   rectificatifs, suivi d'envoi, absences, propagation multi-semaines, notes cuisine,
-   impressions 2 pages, PDF, brouillon Outlook via Power Automate.
+   V40 STABLE (15/09/2026)
+   Version de consolidation : persistance différée uniquement si nécessaire,
+   vérification réelle après écriture Grist, diagnostics de démarrage et
+   chaîne écran → Grist → impression/PDF unifiée.
 */
 'use strict';
 
+const APP_VERSION='V40';
 const DAYS=[
   {key:'Lu',short:'Lun',label:'Lundi',offset:0},{key:'Ma',short:'Mar',label:'Mardi',offset:1},{key:'Me',short:'Mer',label:'Mercredi',offset:2},{key:'Je',short:'Jeu',label:'Jeudi',offset:3},{key:'Ve',short:'Ven',label:'Vendredi',offset:4}
 ];
@@ -14,6 +16,18 @@ const TYPES=['Absent','Repas sur place','Plateau','Container','Pique-nique'];
 const GROUPS=['RDC','1er étage','Professionnel'];
 const DEFAULT_TEMPLATE=`Bonjour,\n\nVeuillez trouver ci-joint la commande repas du SAJ Anagallis pour la {{SEMAINE}}.\n\nJe vous remercie et vous souhaite une bonne journée.\n\nCordialement,\n\nSAJ Anagallis`;
 const TABLES={config:'Repas_Config',template:'Repas_Modele',weeks:'Repas_Semaines',cmd:'Repas_Commandes',guests:'Repas_Invites',closures:'Repas_Fermetures',settings:'Repas_Parametres',audit:'Repas_Journal'};
+const REQUIRED_DOM_IDS=['editor','weekPicker','weekYear','weekList','weekTitle','weekStatus','weekComment','saveWeekBtn','saveTemplateBtn','printBtn','pdfBtn','emailBtn','templateSettings','historyList','historyYear','peopleSettings','closureList','printArea','printSummaryPage','printDetailPage','summaryContent','detailContent','detailScale','toast'];
+const REQUIRED_SCHEMA={
+  [TABLES.config]:['id','PersonKey','Nom','Prenom','Groupe','Regime','Texture','Actif','Lu','Ma','Me','Je','Ve'],
+  [TABLES.template]:['id','PersonKey','Jour','TypeCommande'],
+  [TABLES.weeks]:['id','SemaineKey','Statut','ModifieLeDT','Rectificative'],
+  [TABLES.cmd]:['id','SemaineKey','PersonKey','Groupe','Regime','Texture','Jour','TypeCommande'],
+  [TABLES.guests]:['id','SemaineKey','PersonKey','Regime','Texture','Actif'],
+  [TABLES.closures]:['id','DateDebut','DateFin','Actif'],
+  [TABLES.settings]:['id','Cle','Valeur'],
+  [TABLES.audit]:['id','SemaineKey','DateHeure','Action']
+};
+
 
 let weekStart=mondayOf(new Date());
 let sourceUsers=[],sourcePros=[],config=[],templateRows=[],weeks=[],commands=[],guests=[],closures=[],settings=[],audit=[];
@@ -21,9 +35,10 @@ let repartitions=[],rooms=[];
 let saveTimer=null;
 let lastVisibleOrderSnapshot=[];
 let lastVisibleProfileSnapshot=[];
-// V36 — source unique et sérialisation des profils régime/texture.
+// V40 — écritures de profils sérialisées et vérifiées.
 let liveProfileOverrides=new Map();
 let profileWriteQueue=Promise.resolve();
+let outputPreparationQueue=Promise.resolve();
 let archiveEditUnlocked=false;
 let screenGroupSort={RDC:'name','1er étage':'name',Professionnel:'name','Stagiaire / Visiteur':'name'};
 let templateGroupSort={RDC:'name','1er étage':'name',Professionnel:'name'};
@@ -35,11 +50,14 @@ init();
 
 async function init(){
   try{
+    assertRequiredDom();
+    setVersionBadge();
     bindUI();
     fillStaticSelects();
     await ensureTables();
     await loadAll();
     await ensureSchemaUpgrades();
+    await assertRequiredSchema();
     await loadAll();
     await migrateDateAndYearData();
     await loadAll();
@@ -59,7 +77,7 @@ async function init(){
     await archivePastWeeks();
     await loadAll();
     const currentKey=weekKey(weekStart);
-    if(!weeks.some(w=>w.SemaineKey===currentKey)) weekStart=mondayOf(new Date());
+    if(!weeks.some(w=>w.SemaineKey===currentKey))weekStart=mondayOf(new Date());
     renderAll();
   }catch(err){
     console.error(err);
@@ -67,8 +85,30 @@ async function init(){
   }
 }
 
+function assertRequiredDom(){
+  const missing=REQUIRED_DOM_IDS.filter(id=>!document.getElementById(id));
+  if(missing.length)throw new Error(`Structure HTML incomplète : ${missing.join(', ')}`);
+}
+function setVersionBadge(){
+  const el=document.getElementById('versionBadge');
+  if(el){el.textContent=APP_VERSION;el.title=`Widget Commande repas ${APP_VERSION}`;}
+  document.documentElement.dataset.widgetVersion=APP_VERSION;
+}
+async function assertRequiredSchema(){
+  const errors=[];
+  for(const [table,cols] of Object.entries(REQUIRED_SCHEMA)){
+    const raw=await fetchSafe(table);
+    if(!raw){errors.push(`${table} absent`);continue;}
+    const present=new Set(Object.keys(raw));
+    const missing=cols.filter(c=>!present.has(c));
+    if(missing.length)errors.push(`${table}: ${missing.join(', ')}`);
+  }
+  if(errors.length)throw new Error(`Schéma Grist incomplet — ${errors.join(' ; ')}`);
+}
+
 function showFatalInitError(err){
   const message=String(err?.message||err||'Erreur inconnue');
+  document.querySelectorAll('.fatal-init-error').forEach(x=>x.remove());
   const target=document.getElementById('editor')||document.querySelector('.app')||document.body;
   const box=document.createElement('div');
   box.className='fatal-init-error';
@@ -231,7 +271,7 @@ async function createWeekRows(key){
   if(actions.length) await grist.docApi.applyUserActions(actions);
 }
 
-// V34 — garantit qu'une semaine existante possède bien une ligne de commande
+// V40 — garantit qu'une semaine existante possède bien une ligne de commande
 // par personne active et par jour. Cela répare automatiquement les anciennes
 // semaines incomplètes sans effacer les choix déjà saisis.
 async function ensureWeekRowsComplete(key){
@@ -619,7 +659,7 @@ function dotClass(v,kind){const n=norm(v);if(kind==='diet'){if(n==='hypocaloriqu
 // Régimes : Normal, Sans viande, Sans porc, Hypocalorique, Hypolipidique.
 // Textures : Normale, Purée lisse, Haché lubrifié.
 function canonicalDiet(v){
-  const n=norm(v).replace(/hypolypidique/g,'hypolipidique');
+  const n=profileColorKey(v).replace(/hypolypidique/g,'hypolipidique');
   if(!n||n==='normal'||n==='normale')return'Normal';
   if(n.includes('sans viande'))return'Sans viande';
   if(n.includes('sans porc'))return'Sans porc';
@@ -629,7 +669,7 @@ function canonicalDiet(v){
   return null;
 }
 function canonicalTexture(v){
-  const n=norm(v);
+  const n=profileColorKey(v);
   if(!n||n==='normal'||n==='normale')return'Normale';
   if(n.includes('puree')&&n.includes('lisse'))return'Purée lisse';
   if(n.includes('hache')||n.includes('hach')||n.includes('lubrif'))return'Haché lubrifié';
@@ -754,9 +794,26 @@ function effectiveProfile(personKey,rows=[]){
   };
   return {Regime:choose('Regime',canonicalDiet,'Normal'),Texture:choose('Texture',canonicalTexture,'Normale')};
 }
+function sameText(a,b){return String(a??'')===String(b??'')}
+function profileFieldMatches(row,field,value){
+  if(field==='Regime')return canonicalDiet(row?.Regime)===canonicalDiet(value);
+  if(field==='Texture')return canonicalTexture(row?.Texture)===canonicalTexture(value);
+  return sameText(row?.[field],value);
+}
+function changedProfileFields(row,fields){
+  const out={};
+  for(const [field,value] of Object.entries(fields))if(!profileFieldMatches(row,field,value))out[field]=value;
+  return out;
+}
+function changedMealFields(row,fields){
+  const out={};
+  for(const [field,value] of Object.entries(fields))if(!sameText(row?.[field],value))out[field]=value;
+  return out;
+}
+
 async function persistProfileSnapshot(snapshot,{propagateFuture=false}={}){
-  if(!snapshot?.length)return 0;
-  const actions=[];
+  if(!snapshot?.length)return {actions:0,weekChanged:false,changedPeople:[]};
+  const actions=[];let weekChanged=false;const changedPeople=new Set();
   for(const item of snapshot){
     const fields={};
     if(item.Regime!=null)fields.Regime=canonicalDiet(item.Regime)||'Normal';
@@ -764,42 +821,55 @@ async function persistProfileSnapshot(snapshot,{propagateFuture=false}={}){
     if(!Object.keys(fields).length)continue;
     if(item.isGuest){
       const g=guests.find(x=>x.PersonKey===item.PersonKey)||guests.find(x=>+x.id===+item.guestId);
-      if(g){actions.push(['UpdateRecord',TABLES.guests,g.id,fields]);commands.filter(c=>c.SemaineKey===g.SemaineKey&&c.PersonKey===g.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,fields]))}
+      if(!g)continue;
+      const guestDiff=changedProfileFields(g,fields);
+      if(Object.keys(guestDiff).length){actions.push(['UpdateRecord',TABLES.guests,g.id,guestDiff]);changedPeople.add(item.PersonKey);}
+      commands.filter(c=>c.SemaineKey===g.SemaineKey&&c.PersonKey===g.PersonKey).forEach(c=>{
+        const diff=changedProfileFields(c,fields);if(Object.keys(diff).length){actions.push(['UpdateRecord',TABLES.cmd,c.id,diff]);weekChanged=true;changedPeople.add(item.PersonKey);}
+      });
     }else{
       const p=config.find(x=>x.PersonKey===item.PersonKey)||config.find(x=>+x.id===+item.configId);
-      if(p){actions.push(['UpdateRecord',TABLES.config,p.id,fields]);commands.filter(c=>c.SemaineKey===weekKey(weekStart)&&c.PersonKey===p.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,fields]))}
+      if(!p)continue;
+      const cfgDiff=changedProfileFields(p,fields);
+      if(Object.keys(cfgDiff).length){actions.push(['UpdateRecord',TABLES.config,p.id,cfgDiff]);changedPeople.add(item.PersonKey);}
+      commands.filter(c=>c.SemaineKey===weekKey(weekStart)&&c.PersonKey===p.PersonKey).forEach(c=>{
+        const diff=changedProfileFields(c,fields);if(Object.keys(diff).length){actions.push(['UpdateRecord',TABLES.cmd,c.id,diff]);weekChanged=true;changedPeople.add(item.PersonKey);}
+      });
     }
   }
   if(actions.length)await grist.docApi.applyUserActions(actions);
   applyProfileSnapshotToMemory(snapshot);
-  if(actions.length)await touchWeek(true);
+  if(weekChanged)await touchWeek(true);
   if(propagateFuture){
-    for(const item of snapshot.filter(x=>!x.isGuest))await syncConfigToFutureWeeks(item.PersonKey,{updateProfile:true,excludeWeek:weekKey(weekStart)});
+    for(const personKey of changedPeople){
+      if(!String(personKey).startsWith('G:'))await syncConfigToFutureWeeks(personKey,{updateProfile:true,excludeWeek:weekKey(weekStart)});
+    }
   }
-  return actions.length;
+  return {actions:actions.length,weekChanged,changedPeople:[...changedPeople]};
 }
 async function reloadAndVerifyProfiles(snapshot,attempts=3){
   let lastErr=null;
   for(let i=0;i<attempts;i++){
     await loadAll();
-    // Toujours réappliquer le snapshot validé à la mémoire d'impression : cela élimine
-    // tout décalage de cache/rafraîchissement entre Grist et le rendu PDF/impression.
-    applyProfileSnapshotToMemory(snapshot);
     try{
       for(const expected of snapshot||[]){
-        const rows=currentCommands().filter(r=>r.PersonKey===expected.PersonKey);
-        if(!rows.length)continue;
+        const source=expected.isGuest
+          ? (guests.find(x=>x.PersonKey===expected.PersonKey)||guests.find(x=>+x.id===+expected.guestId))
+          : (config.find(x=>x.PersonKey===expected.PersonKey)||config.find(x=>+x.id===+expected.configId));
+        if(!source)throw new Error(`Profil introuvable pour ${expected.PersonKey}.`);
+        if(expected.Regime!=null&&!profileFieldMatches(source,'Regime',expected.Regime))throw new Error(`Régime non relu dans Grist pour ${source.Nom||expected.PersonKey}.`);
+        if(expected.Texture!=null&&!profileFieldMatches(source,'Texture',expected.Texture))throw new Error(`Texture non relue dans Grist pour ${source.Nom||expected.PersonKey}.`);
+        const rows=commands.filter(r=>r.SemaineKey===weekKey(weekStart)&&r.PersonKey===expected.PersonKey);
         for(const row of rows){
-          if(expected.Regime!=null&&canonicalDiet(row.Regime)!==canonicalDiet(expected.Regime))throw new Error(`Régime non relu pour ${row.Nom||expected.PersonKey}`);
-          if(expected.Texture!=null&&canonicalTexture(row.Texture)!==canonicalTexture(expected.Texture))throw new Error(`Texture non relue pour ${row.Nom||expected.PersonKey}`);
+          if(expected.Regime!=null&&!profileFieldMatches(row,'Regime',expected.Regime))throw new Error(`Régime non relu pour ${row.Nom||expected.PersonKey}.`);
+          if(expected.Texture!=null&&!profileFieldMatches(row,'Texture',expected.Texture))throw new Error(`Texture non relue pour ${row.Nom||expected.PersonKey}.`);
         }
       }
-      return;
-    }catch(err){lastErr=err;if(i<attempts-1)await new Promise(r=>setTimeout(r,120*(i+1)))}
+      applyProfileSnapshotToMemory(snapshot);
+      return true;
+    }catch(err){lastErr=err;if(i<attempts-1)await new Promise(r=>setTimeout(r,120*(i+1)));}
   }
-  // Les actions Grist ont réussi mais une relecture peut être momentanément en retard.
-  // On conserve le snapshot utilisateur en mémoire pour garantir un rendu fidèle.
-  if(lastErr)console.warn('Relecture profil retardée, snapshot écran conservé pour le rendu',lastErr);
+  throw lastErr||new Error('Contrôle du profil impossible.');
 }
 async function saveScreenProfileField(e){
   const field=e.target.dataset.profileField,value=e.target.value,isGuest=e.target.dataset.profileGuest==='1';
@@ -808,77 +878,106 @@ async function saveScreenProfileField(e){
   const personKey=e.target.dataset.profileKey||'';
   rememberLiveProfile(personKey,field,value);
   const snapshot=[{PersonKey:personKey,isGuest,guestId:+e.target.dataset.profileId||0,configId:+e.target.dataset.profileId||0,[field]:value}];
-  // Sérialiser les écritures : un clic Enregistrer/Imprimer ne peut plus doubler une écriture onchange.
   profileWriteQueue=profileWriteQueue.then(async()=>{
-    await persistProfileSnapshot(snapshot,{propagateFuture:!isGuest});
-    await reloadAndVerifyProfiles(snapshot);
+    const result=await persistProfileSnapshot(snapshot,{propagateFuture:!isGuest});
+    if(result.actions)await reloadAndVerifyProfiles(snapshot);
     renderPrint();showSavedState();
-  }).catch(err=>{console.error(err);toast('Échec de l’enregistrement du profil : '+err.message)});
+  }).catch(async err=>{
+    console.error(err);
+    liveProfileOverrides.delete(personKey);
+    try{await loadAll();renderAll();}catch(_e){}
+    toast('Échec de l’enregistrement du profil : '+(err.message||err));
+  });
   await profileWriteQueue;
-}
-
-async function persistProfileValue({personKey,field,value,isGuest=false,guestId=0,configId=0,propagateFuture=false}){
-  if(!personKey||!['Groupe','Regime','Texture'].includes(field))return 0;
-  const actions=[];
-  if(isGuest){
-    const g=guests.find(x=>x.PersonKey===personKey)||guests.find(x=>+x.id===+guestId);
-    if(!g)return 0;
-    if(field!=='Groupe')actions.push(['UpdateRecord',TABLES.guests,g.id,{[field]:value}]);
-    commands.filter(c=>c.SemaineKey===g.SemaineKey&&c.PersonKey===g.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,{[field]:value}]));
-  }else{
-    const p=config.find(x=>x.PersonKey===personKey)||config.find(x=>+x.id===+configId);
-    if(!p)return 0;
-    actions.push(['UpdateRecord',TABLES.config,p.id,{[field]:value}]);
-    // La commande affichée est la source utilisée par l'impression/PDF : mettre à jour
-    // toutes les lignes de la personne, y compris d'éventuels doublons historiques.
-    commands.filter(c=>c.SemaineKey===weekKey(weekStart)&&c.PersonKey===p.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,{[field]:value}]));
-  }
-  if(actions.length)await grist.docApi.applyUserActions(actions);
-  if(!isGuest){
-    await touchWeek(true);
-    await loadAll();
-    if(propagateFuture)await syncConfigToFutureWeeks(personKey,{updateProfile:true,excludeWeek:weekKey(weekStart)});
-  }else await touchWeek(true);
-  return actions.length;
 }
 
 async function flushVisibleProfileSelections(){
-  // Attendre une éventuelle sauvegarde déclenchée par onchange avant de prendre le snapshot final.
   await profileWriteQueue;
   const snapshot=visibleProfileSnapshot('#editor');
   lastVisibleProfileSnapshot=snapshot.map(x=>({...x}));
-  const changes=await persistProfileSnapshot(snapshot,{propagateFuture:false});
-  // On met à jour la mémoire immédiatement, puis on relit Grist avec contrôle.
-  applyProfileSnapshotToMemory(snapshot);
-  if(changes)await reloadAndVerifyProfiles(snapshot);
-  return changes;
+  const result=await persistProfileSnapshot(snapshot,{propagateFuture:false});
+  if(result.actions)await reloadAndVerifyProfiles(snapshot);
+  else verifyVisibleProfileSnapshot();
+  return result.actions;
 }
 
 function verifyVisibleProfileSnapshot(){
   if(!lastVisibleProfileSnapshot.length)return;
   for(const expected of lastVisibleProfileSnapshot){
+    const source=expected.isGuest
+      ? (guests.find(x=>x.PersonKey===expected.PersonKey)||guests.find(x=>+x.id===+expected.guestId))
+      : (config.find(x=>x.PersonKey===expected.PersonKey)||config.find(x=>+x.id===+expected.configId));
+    if(!source)throw new Error(`Profil introuvable pour ${expected.PersonKey}.`);
+    if(expected.Regime!=null&&!profileFieldMatches(source,'Regime',expected.Regime))throw new Error(`Contrôle d’enregistrement du régime échoué pour ${source.Nom||expected.PersonKey}.`);
+    if(expected.Texture!=null&&!profileFieldMatches(source,'Texture',expected.Texture))throw new Error(`Contrôle d’enregistrement de la texture échoué pour ${source.Nom||expected.PersonKey}.`);
     const rows=currentCommands().filter(r=>r.PersonKey===expected.PersonKey);
-    if(!rows.length)continue;
-    const eff=effectiveProfile(expected.PersonKey,rows);
-    if(expected.Regime!=null&&canonicalDiet(eff.Regime)!==canonicalDiet(expected.Regime))throw new Error(`Contrôle d’enregistrement du régime échoué pour ${rows[0]?.Nom||expected.PersonKey}.`);
-    if(expected.Texture!=null&&canonicalTexture(eff.Texture)!==canonicalTexture(expected.Texture))throw new Error(`Contrôle d’enregistrement de la texture échoué pour ${rows[0]?.Nom||expected.PersonKey}.`);
+    for(const row of rows){
+      if(expected.Regime!=null&&!profileFieldMatches(row,'Regime',expected.Regime))throw new Error(`Régime non synchronisé pour ${row.Nom||expected.PersonKey}.`);
+      if(expected.Texture!=null&&!profileFieldMatches(row,'Texture',expected.Texture))throw new Error(`Texture non synchronisée pour ${row.Nom||expected.PersonKey}.`);
+    }
   }
 }
 
 async function prepareCurrentWeekForOutput(){
-  // V36 : la source de vérité du rendu est le dernier état visible validé par l'utilisateur.
-  // On attend toutes les écritures, on enregistre repas + profils, puis on réapplique le
-  // snapshot au modèle en mémoire avant de construire l'impression/PDF.
-  await profileWriteQueue;
-  await flushVisibleOrderSelections();
-  await flushVisibleProfileSelections();
-  await loadAll();
-  applyProfileSnapshotToMemory(lastVisibleProfileSnapshot);
-  verifyVisibleOrderSnapshot();
-  verifyVisibleProfileSnapshot();
-  renderCommande();
-  // renderCommande recrée le DOM mais ne doit pas modifier le snapshot d'impression.
-  applyProfileSnapshotToMemory(lastVisibleProfileSnapshot);
+  outputPreparationQueue=outputPreparationQueue.then(async()=>{
+    await profileWriteQueue;
+    const mealUpdates=await flushVisibleOrderSelections();
+    const profileUpdates=await flushVisibleProfileSelections();
+    if(mealUpdates>0&&profileUpdates===0)await loadAll();
+    verifyVisibleOrderSnapshot();
+    verifyVisibleProfileSnapshot();
+    renderCommande();
+    return {mealUpdates,profileUpdates};
+  });
+  return outputPreparationQueue;
+}
+
+function renderHistory(){
+  const today=mondayOf(new Date());
+  const pastWeeks=[...weeks].filter(w=>{const d=parseKey(w.SemaineKey);return isValidDate(d)&&d<today;});
+  const years=[...new Set(pastWeeks.map(weekYearOf))].sort((a,b)=>b-a);
+  const current=$('historyYear')?.value||'all';
+  $('historyYear').innerHTML=`<option value="all">Toutes</option>${years.map(y=>`<option value="${y}" ${String(y)===String(current)?'selected':''}>${y}</option>`).join('')}`;
+  if(current!=='all'&&!years.includes(+current)) $('historyYear').value='all';
+  const filter=$('historyYear').value;
+  const rows=pastWeeks.filter(w=>filter==='all'||weekYearOf(w)===+filter).sort((a,b)=>b.SemaineKey.localeCompare(a.SemaineKey));
+  $('historyList').innerHTML=`<div class="history-head"><span>Semaine</span><span>Année</span><span>Statut</span><span>Dernière modification</span></div>`+(rows.map(w=>`<div class="history-row"><button data-history="${w.SemaineKey}">${weekLabel(parseKey(w.SemaineKey))}</button><span>${weekYearOf(w)}</span><span class="status ${statusClass(effectiveWeekStatus(w))}">${esc(w.Rectificative?'Rectificative':effectiveWeekStatus(w))}</span><span>${esc(lastModifiedText(w))}</span></div>`).join('')||'<p>Aucune commande passée dans l’historique.</p>');
+  document.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{openWeek(b.dataset.history);switchTab('commande')});
+}
+
+function renderSettings(){
+  let rows=[...config];
+  if(settingsGroupFilter!=='all')rows=rows.filter(p=>p.Groupe===settingsGroupFilter);
+  if(settingsActiveFilter==='active')rows=rows.filter(p=>p.Actif!==false);
+  if(settingsActiveFilter==='inactive')rows=rows.filter(p=>p.Actif===false);
+  rows=sortPeopleSimple(rows,settingsSort);
+  const groupOptions=v=>['RDC','1er étage','Professionnel'].map(x=>`<option value="${x}" ${v===x?'selected':''}>${x==='Professionnel'?'Professionnels':x}</option>`).join('');
+  const dietOptions=v=>DIETS.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
+  const textureOptions=v=>TEXTURES.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
+  $('peopleSettings').innerHTML=`<div class="list-controls"><label>Groupe <select id="settingsGroupFilter"><option value="all">Tous</option><option value="RDC" ${settingsGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${settingsGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${settingsGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Actif <select id="settingsActiveFilter"><option value="all">Tous</option><option value="active" ${settingsActiveFilter==='active'?'selected':''}>Actifs</option><option value="inactive" ${settingsActiveFilter==='inactive'?'selected':''}>Inactifs</option></select></label><label>Trier par <select id="settingsSort"><option value="name" ${settingsSort==='name'?'selected':''}>Nom</option><option value="group" ${settingsSort==='group'?'selected':''}>Groupe</option><option value="diet" ${settingsSort==='diet'?'selected':''}>Régime</option><option value="texture" ${settingsSort==='texture'?'selected':''}>Texture</option><option value="active" ${settingsSort==='active'?'selected':''}>Actif</option></select></label></div><table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Groupe">${groupOptions(p.Groupe)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Regime,'Regime')}" data-profile-id="${p.id}" data-profile-field="Regime">${dietOptions(p.Regime)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Texture,'Texture')}" data-profile-id="${p.id}" data-profile-field="Texture">${textureOptions(p.Texture)}</select></td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
+  $('settingsGroupFilter').onchange=e=>{settingsGroupFilter=e.target.value;renderSettings()};
+  $('settingsActiveFilter').onchange=e=>{settingsActiveFilter=e.target.value;renderSettings()};
+  $('settingsSort').onchange=e=>{settingsSort=e.target.value;renderSettings()};
+  document.querySelectorAll('#peopleSettings .inline-profile-select').forEach(el=>el.onchange=saveInlineProfileField);
+  document.querySelectorAll('[data-edit-person]').forEach(b=>b.onclick=()=>editPerson(+b.dataset.editPerson));document.querySelectorAll('[data-toggle-person]').forEach(b=>b.onclick=()=>togglePerson(+b.dataset.togglePerson));
+  const cls=[...closures].filter(x=>x.Actif!==false).sort((a,b)=>a.DateDebut.localeCompare(b.DateDebut));$('closureList').innerHTML=cls.length?`<table class="settings-table"><thead><tr><th>Du</th><th>Au</th><th>Motif</th><th></th></tr></thead><tbody>${cls.map(x=>`<tr><td>${frDate(parseKey(x.DateDebut))}</td><td>${frDate(parseKey(x.DateFin))}</td><td>${esc(x.Motif)}</td><td><button class="mini danger" data-remove-closure="${x.id}">Supprimer</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Aucune fermeture enregistrée.</p>';
+  document.querySelectorAll('[data-remove-closure]').forEach(b=>b.onclick=()=>removeClosure(+b.dataset.removeClosure));
+}
+
+async function saveInlineProfileField(e){
+  const id=+e.target.dataset.profileId;const field=e.target.dataset.profileField;const p=config.find(x=>+x.id===id);if(!p)return;
+  let value=e.target.value;
+  if(field==='Regime')value=canonicalDiet(value)||'Normal';
+  if(field==='Texture')value=canonicalTexture(value)||'Normale';
+  if(profileFieldMatches(p,field,value)){if(field==='Regime'||field==='Texture'){e.target.className=`inline-profile-select ${profileValueClass(value,field)}`;}return;}
+  try{
+    await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,p.id,{[field]:value}]]);
+    Object.assign(p,{[field]:value});
+    await syncConfigToFutureWeeks(p.PersonKey,{updateProfile:true});
+    await loadAll();
+    renderAll();
+    showSavedState('Profil enregistré');
+  }catch(err){console.error(err);toast('Échec de la modification du profil : '+(err.message||err));await loadAll();renderAll();}
 }
 
 function renderTemplateEditor(){
@@ -1120,7 +1219,7 @@ function bindUI(){
   $('saveTemplateBtn').onclick=saveTemplateExplicitly;
   $('weekStatus').onchange=saveWeekStatus;$('weekComment').oninput=debounceSaveComment;$('resetWeek').onclick=resetWeekFromTemplate;
   $('checkOrder').onclick=showValidation;$('absenceBtn').onclick=openAbsenceDialog;$('absenceForm').addEventListener('submit',applyAbsenceRange);$('propagateForm').addEventListener('submit',applyPropagation);$('unlockArchive').onclick=unlockArchivedWeek;
-  $('printBtn').onclick=async()=>{const b=$('printBtn');b.disabled=true;try{await prepareCurrentWeekForOutput();renderPrint();fitDetailDensity();setTimeout(()=>window.print(),80)}catch(err){console.error(err);toast('Impossible de préparer l’impression : '+err.message)}finally{b.disabled=false}};$('pdfBtn').onclick=()=>downloadPdf();$('emailBtn').onclick=openEmailDialog;
+  $('printBtn').onclick=handlePrintClick;$('pdfBtn').onclick=handlePdfClick;$('emailBtn').onclick=openEmailDialog;
   $('logoFile').onchange=onLogoFileChange;$('removeLogo').onclick=removeLogo;
   $('addPerson').onclick=()=>openPersonDialog();$('personSource').onchange=onPersonSourceChange;$('sourcePerson').onchange=applySourceSelection;$('personForm').addEventListener('submit',savePersonFromDialog);
   $('guestForm').addEventListener('submit',saveGuestFromDialog);
@@ -1129,6 +1228,25 @@ function bindUI(){
   $('emailForm').addEventListener('submit',createOutlookDraft);
   window.addEventListener('beforeprint',()=>{renderPrint();fitDetailDensity()});
 }
+async function handlePrintClick(){
+  const b=$('printBtn');const originalLabel=b.innerHTML;
+  b.disabled=true;b.setAttribute('aria-busy','true');b.innerHTML='⏳ Patientez un instant…';
+  toast('Préparation de l’impression… La fenêtre d’impression va s’ouvrir automatiquement.');
+  try{
+    await prepareCurrentWeekForOutput();renderPrint();fitDetailDensity();
+    b.innerHTML='⏳ Ouverture de l’impression…';
+    await new Promise(r=>setTimeout(r,120));
+    window.print();
+  }catch(err){console.error(err);toast('Impossible de préparer l’impression : '+(err.message||err));}
+  finally{b.innerHTML=originalLabel;b.disabled=false;b.removeAttribute('aria-busy');}
+}
+async function handlePdfClick(){
+  const b=$('pdfBtn');const originalLabel=b.innerHTML;
+  b.disabled=true;b.setAttribute('aria-busy','true');b.innerHTML='⏳ Création du PDF…';
+  try{await downloadPdf();}
+  finally{b.innerHTML=originalLabel;b.disabled=false;b.removeAttribute('aria-busy');}
+}
+
 function fillStaticSelects(){[$('personDiet'),$('guestDiet')].forEach(s=>s.innerHTML=DIETS.map(x=>`<option>${x}</option>`).join(''));[$('personTexture'),$('guestTexture')].forEach(s=>s.innerHTML=TEXTURES.map(x=>`<option>${x}</option>`).join(''));$('personDays').innerHTML=DAYS.map(d=>`<label><input type="checkbox" data-pday="${d.key}"> ${d.short}</label>`).join('');$('guestDays').innerHTML=DAYS.map(d=>`<label><input type="checkbox" data-gday="${d.key}" checked> ${d.short}</label>`).join('')}
 function switchTab(name){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));document.querySelectorAll('.tab-panel').forEach(x=>x.classList.toggle('active',x.id==='tab-'+name))}
 async function openWeek(key){const d=mondayOf(parseKey(key));await ensureWeek(d);await loadAll();await ensureWeekRowsComplete(weekKey(d));await loadAll();weekStart=d;archiveEditUnlocked=false;renderAll()}
@@ -1137,6 +1255,7 @@ function changeWeek(days){openWeek(weekKey(addDays(weekStart,days)))}
 async function saveWeekStatus(){
   const w=currentWeek();if(!w)return;
   const old=effectiveWeekStatus(w),status=$('weekStatus').value;
+  if(status==='Archivée'&&!isWeekArchived(w)){$('weekStatus').value=old;toast('Une semaine en cours ou future ne peut pas être archivée manuellement. Elle sera archivée automatiquement une fois passée.');return;}
   const now=new Date(),iso=now.toISOString(),fields={Statut:status,ModifieLe:iso,ModifieLeDT:gristDateTime(now)};
   if(status==='Commandée'){fields.CommandeeLe=iso;fields.CommandeeLeDT=gristDateTime(now)}
   try{
@@ -1154,8 +1273,7 @@ async function flushVisibleOrderSelections(){
   const actions=[];lastVisibleOrderSnapshot=[];
   document.querySelectorAll('#editor select[data-order-id]').forEach(sel=>{
     const id=+sel.dataset.orderId;const row=commands.find(x=>+x.id===id);if(!row)return;
-    const type=sel.value;
-    const td=sel.closest('td');
+    const type=sel.value;const td=sel.closest('td');
     const fields={
       TypeCommande:type,
       HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(td?.querySelector('[data-time-id]')?.value||row.HeureRetrait||''):'',
@@ -1164,7 +1282,10 @@ async function flushVisibleOrderSelections(){
     };
     lastVisibleOrderSnapshot.push({SemaineKey:row.SemaineKey,PersonKey:row.PersonKey,Jour:row.Jour,...fields});
     const siblings=commands.filter(x=>x.SemaineKey===row.SemaineKey&&x.PersonKey===row.PersonKey&&x.Jour===row.Jour).sort((a,b)=>(+b.id||0)-(+a.id||0));
-    if(siblings.length){actions.push(['UpdateRecord',TABLES.cmd,siblings[0].id,fields]);for(const dupe of siblings.slice(1))actions.push(['RemoveRecord',TABLES.cmd,dupe.id])}
+    if(!siblings.length)return;
+    const diff=changedMealFields(siblings[0],fields);
+    if(Object.keys(diff).length)actions.push(['UpdateRecord',TABLES.cmd,siblings[0].id,diff]);
+    for(const dupe of siblings.slice(1))actions.push(['RemoveRecord',TABLES.cmd,dupe.id]);
   });
   if(actions.length)await grist.docApi.applyUserActions(actions);
   return actions.length;
@@ -1174,7 +1295,10 @@ async function flushVisibleOrderSelections(){
 function verifyVisibleOrderSnapshot(){
   if(!lastVisibleOrderSnapshot.length)return;
   const map=new Map(currentCommands().map(r=>[`${r.PersonKey}|${r.Jour}`,r]));
-  for(const s of lastVisibleOrderSnapshot){const a=map.get(`${s.PersonKey}|${s.Jour}`);if(!a||a.TypeCommande!==s.TypeCommande)throw new Error(`Contrôle d’enregistrement échoué pour ${s.PersonKey} ${s.Jour}.`)}
+  for(const s of lastVisibleOrderSnapshot){
+    const a=map.get(`${s.PersonKey}|${s.Jour}`);
+    if(!a||!sameText(a.TypeCommande,s.TypeCommande)||!sameText(a.HeureRetrait,s.HeureRetrait)||!sameText(a.Pain,s.Pain)||!sameText(a.OptionPique,s.OptionPique))throw new Error(`Contrôle d’enregistrement échoué pour ${s.PersonKey} ${s.Jour}.`);
+  }
 }
 
 async function saveCurrentWeekExplicitly(){
@@ -1261,7 +1385,17 @@ async function removeClosure(id){if(!confirm('Supprimer cette fermeture ? Les se
 function closureFor(date){const k=weekKey(date);return closures.find(x=>x.Actif!==false&&x.DateDebut<=k&&x.DateFin>=k)}
 function weekClosureInfo(monday){const days=[];const reasons=new Set();DAYS.forEach(d=>{const cl=closureFor(addDays(monday,d.offset));if(cl){days.push({day:d,closure:cl});reasons.add(cl.Motif||'Fermeture')}});return{days,reasons:[...reasons]}}
 
-async function saveEmailSettings(){await saveSetting('auditUser',$('auditUserSetting').value.trim());await loadAll();await saveSetting('emailTo',$('emailToSetting').value.trim());await loadAll();await saveSetting('emailCc',$('emailCcSetting').value.trim());await loadAll();await saveSetting('emailTemplate',$('emailTemplateSetting').value||DEFAULT_TEMPLATE);await loadAll();await saveSetting('powerAutomateUrl',$('powerAutomateUrl').value.trim());await loadAll();renderEmailSettings();toast('Paramètres e-mail enregistrés.')}
+async function saveEmailSettings(){
+  const values={auditUser:$('auditUserSetting').value.trim(),emailTo:$('emailToSetting').value.trim(),emailCc:$('emailCcSetting').value.trim(),emailTemplate:$('emailTemplateSetting').value||DEFAULT_TEMPLATE,powerAutomateUrl:$('powerAutomateUrl').value.trim()};
+  const actions=[];
+  for(const [key,value] of Object.entries(values)){
+    const row=settings.find(x=>x.Cle===key);
+    if(row){if(!sameText(row.Valeur,value))actions.push(['UpdateRecord',TABLES.settings,row.id,{Valeur:value}]);}
+    else actions.push(['AddRecord',TABLES.settings,null,{Cle:key,Valeur:value}]);
+  }
+  if(actions.length)await grist.docApi.applyUserActions(actions);
+  await loadAll();renderEmailSettings();toast('Paramètres e-mail enregistrés.');
+}
 function openEmailDialog(){const wk=emailWeekText(weekStart),w=currentWeek();$('emailTo').value=getSetting('emailTo','');$('emailCc').value=getSetting('emailCc','');$('emailSubject').value=`SAJ commande repas${w?.Rectificative?' rectificative':''} - ${wk}`;$('emailBody').value=applyTemplate(getSetting('emailTemplate',DEFAULT_TEMPLATE),wk);$('attachPdf').checked=true;$('emailDialog').showModal()}
 function applyTemplate(t,wk){return String(t||DEFAULT_TEMPLATE).replaceAll('{{SEMAINE}}',wk)}
 async function createOutlookDraft(e){e.preventDefault();const check=validateCurrentWeek();if(check.errors.length&&!confirm(`La commande présente ${check.errors.length} anomalie(s). Continuer malgré tout ?`))return;const payload={to:$('emailTo').value.trim(),cc:$('emailCc').value.trim(),subject:$('emailSubject').value,body:$('emailBody').value,week:weekKey(weekStart),fileName:pdfFileName()};const wantPdf=$('attachPdf').checked;const flow=getSetting('powerAutomateUrl','').trim();try{if(flow){if(wantPdf){const blob=await buildPdfBlob();payload.pdfBase64=await blobToBase64(blob)}const res=await fetch(flow,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!res.ok)throw new Error(`Power Automate : ${res.status}`);await markWeekEvent('BrouillonLeDT','Brouillon Outlook créé');$('emailDialog').close();toast('Brouillon Outlook créé.');return}if(wantPdf)await downloadPdf();const url=`mailto:${encodeURIComponent(payload.to)}?cc=${encodeURIComponent(payload.cc)}&subject=${encodeURIComponent(payload.subject)}&body=${encodeURIComponent(payload.body)}`;window.open(url,'_blank');await markWeekEvent('BrouillonLeDT','Outlook ouvert / brouillon préparé');$('emailDialog').close();toast('Outlook ouvert. Ajoutez le PDF téléchargé en pièce jointe.')}catch(err){console.error(err);toast('Impossible de créer le brouillon : '+err.message)}}
@@ -1319,18 +1453,6 @@ function pdfFileName(){return `SAJ-commande-repas-${weekKey(weekStart)}.pdf`}
 function blobToBase64(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob)})}
 
 
-function renderDashboard(){
-  const c=currentCommands(),w=currentWeek();if(!$('dashboard'))return;
-  const active=c.filter(x=>!['Absent','Fermé'].includes(x.TypeCommande));
-  const onsite=active.filter(x=>x.TypeCommande==='Repas sur place').length;
-  const specials=active.filter(x=>['Plateau','Container','Pique-nique'].includes(x.TypeCommande)).length;
-  const prevKey=weekKey(addDays(weekStart,-7)),prev=commands.filter(x=>x.SemaineKey===prevKey&&!['Absent','Fermé'].includes(x.TypeCommande)).length;
-  const delta=prev?active.length-prev:null;const check=validateCurrentWeek();
-  const state=w?.Rectificative?'Rectificative':effectiveWeekStatus(w);
-  const send=w?.CommandeeLeDT?`Commandée ${formatDateTime(w.CommandeeLeDT)}`:w?.BrouillonLeDT?`Brouillon ${formatDateTime(w.BrouillonLeDT)}`:'Non envoyée';
-  $('dashboard').innerHTML=`<div class="dash-card"><small>Total semaine</small><b>${active.length}</b><span>repas</span></div><div class="dash-card"><small>Sur place</small><b>${onsite}</b><span>repas</span></div><div class="dash-card"><small>Demandes spéciales</small><b>${specials}</b><span>plateaux / containers / pique-niques</span></div><div class="dash-card ${delta>0?'warn':''}"><small>Semaine précédente</small><b>${prev||'—'}</b><span>${delta===null?'pas de comparaison':`${delta>=0?'+':''}${delta} repas`}</span></div><div class="dash-card ${check.errors.length?'alert':'good'}"><small>${esc(state)}</small><b>${check.errors.length?check.errors.length:'OK'}</b><span>${check.errors.length?'anomalie(s)':esc(send)}</span></div>`;
-}
-
 function weekAlertClass(w){
   if(isWeekArchived(w)||w.Statut==='Commandée')return'';
   const diff=Math.round((parseKey(w.SemaineKey)-mondayOf(new Date()))/86400000);
@@ -1354,7 +1476,7 @@ function dayName(k){return DAYS.find(d=>d.key===k)?.label||k}
 function renderAudit(){if(!$('auditList'))return;const rows=audit.filter(x=>x.SemaineKey===weekKey(weekStart)).sort((a,b)=>(b.DateHeure||0)-(a.DateHeure||0)).slice(0,80);$('auditList').innerHTML=rows.length?rows.map(x=>`<div class="audit-row"><span>${formatDateTime(x.DateHeure)}</span><span>${esc(x.Auteur||'Utilisateur')}</span><span>${esc(x.Action||'')}</span><span class="audit-detail">${esc(x.Detail||x.NouvelleValeur||'')}</span></div>`).join(''):'<div class="audit-empty">Aucune modification enregistrée pour cette semaine.</div>'}
 async function logAudit({week=weekKey(weekStart),action='Modification',row=null,oldValue='',newValue='',detail=''}){try{await grist.docApi.applyUserActions([['AddRecord',TABLES.audit,null,{SemaineKey:week,DateHeure:gristDateTime(new Date()),Auteur:getSetting('auditUser','')||'Utilisateur du widget',Action:action,PersonKey:row?.PersonKey||'',NomPrenom:row?`${row.Nom||''} ${row.Prenom||''}`.trim():'',Jour:row?.Jour||'',AncienneValeur:String(oldValue??''),NouvelleValeur:String(newValue??''),Detail:detail||''}]])}catch(e){console.warn('Journal non disponible',e)}}
 
-async function markWeekEvent(field,detail){const w=currentWeek();if(!w)return;const now=new Date();await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{[field]:gristDateTime(now)}]]);await logAudit({action:'Suivi',detail});await loadAll();renderDashboard();renderHistory()}
+async function markWeekEvent(field,detail){const w=currentWeek();if(!w)return;const now=new Date();await grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{[field]:gristDateTime(now)}]]);await logAudit({action:'Suivi',detail});await loadAll();renderHistory()}
 function formatDateTime(v){const d=dateFromGrist(v);return d?new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(d):'—'}
 
 function openAbsenceDialog(){const persons=uniquePeople(currentCommands()).sort(comparePeople);$('absencePerson').innerHTML=persons.map(p=>`<option value="${esc(p.PersonKey)}">${esc(p.Nom)} ${esc(p.Prenom)}</option>`).join('');$('absenceStart').value=weekKey(weekStart);$('absenceEnd').value=weekKey(addDays(weekStart,4));$('absenceDialog').showModal()}
