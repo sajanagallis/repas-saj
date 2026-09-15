@@ -356,9 +356,9 @@ function summaryGroup(group,band,totalClass,c){
   const rows=c.filter(x=>x.Groupe===group&&x.TypeCommande==='Repas sur place');
   const title=group==='Professionnel'?'PROFESSIONNELS':group;
   const defs=group==='Professionnel'?[['Normal','diet'],['Sans viande','diet'],['Sans porc','diet'],['Hypocalorique','diet'],['Hypolipidique','diet']]:[['Normal','diet'],['Sans viande','diet'],['Sans porc','diet'],['Hypocalorique','diet'],['Hypolipidique','diet'],['Purée lisse','texture'],['Haché lubrifié','texture']];
-  const body=defs.map(([label,kind])=>{const pred=x=>kind==='diet'?norm(x.Regime)===norm(label):norm(x.Texture)===norm(label);return `<tr><td>${pill(label,kind)}</td>${DAYS.map(d=>`<td>${rows.filter(x=>x.Jour===d.key&&pred(x)).length}</td>`).join('')}<td>${rows.filter(pred).length}</td></tr>`}).join('');
+  const body=defs.map(([label,kind])=>{const pred=x=>kind==='diet'?norm(x.Regime)===norm(label):norm(x.Texture)===norm(label);return `<tr><td>${pill(label,kind)}</td>${DAYS.map(d=>{const n=rows.filter(x=>x.Jour===d.key&&pred(x)).length;return `<td class="${n!==0?'meal-count-nonzero':''}">${n}</td>`}).join('')}<td>${rows.filter(pred).length}</td></tr>`}).join('');
   const perDay=DAYS.map(d=>rows.filter(x=>x.Jour===d.key).length);const total=perDay.reduce((a,b)=>a+b,0);
-  return `<section class="print-section"><div class="print-section-title ${band}"><span>${title}</span><span>Total semaine : ${total} repas</span></div><table><thead><tr><th>Type de repas</th>${DAYS.map((d,i)=>`<th>${d.short}<br>${dayMonth(addDays(weekStart,i))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}<tr class="total-row ${totalClass}"><td>Total ${title.toLowerCase()}</td>${perDay.map(n=>`<td>${n}</td>`).join('')}<td>${total}</td></tr></tbody></table></section>`
+  return `<section class="print-section"><div class="print-section-title ${band}"><span>${title}</span><span>Total semaine : ${total} repas</span></div><table><thead><tr><th>Type de repas</th>${DAYS.map((d,i)=>`<th>${d.short}<br>${dayMonth(addDays(weekStart,i))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}<tr class="total-row ${totalClass}"><td>Total ${title.toLowerCase()}</td>${perDay.map(n=>`<td class="${n!==0?'meal-count-nonzero':''}">${n}</td>`).join('')}<td>${total}</td></tr></tbody></table></section>`
 }
 function summaryGuests(c){const rows=c.filter(x=>x.Groupe==='Stagiaire / Visiteur'&&x.TypeCommande==='Repas sur place');if(!rows.length)return'';const perDay=DAYS.map(d=>rows.filter(x=>x.Jour===d.key).length);return `<section class="print-section"><div class="print-section-title band-guest"><span>STAGIAIRES / VISITEURS</span><span>Total semaine : ${perDay.reduce((a,b)=>a+b,0)} repas</span></div><table><tbody><tr class="total-row total-guest"><td>Total stagiaires / visiteurs</td>${perDay.map(n=>`<td>${n}</td>`).join('')}<td>${perDay.reduce((a,b)=>a+b,0)}</td></tr></tbody></table></section>`}
 function specialSummaryCards(c){
@@ -380,17 +380,51 @@ function detailGroup(group,c){
 function specialDetail(type,c){const rows=c.filter(x=>x.TypeCommande===type).sort((a,b)=>dayIndex(a.Jour)-dayIndex(b.Jour)||comparePeople(a,b));if(!rows.length)return'';const band=type==='Plateau'?'band-tray':type==='Container'?'band-container':'band-picnic';const title=type==='Pique-nique'?'PIQUE-NIQUES':type.toUpperCase()+'S';return `<section class="print-section"><div class="print-section-title ${band}">${title}</div><table><thead><tr><th>Nom – Prénom</th><th>Jour</th><th>Régime</th><th>Texture</th>${type==='Pique-nique'?'<th>Pain</th><th>Option</th>':''}<th>Heure</th></tr></thead><tbody>${rows.map(x=>`<tr><td class="name">${esc(x.Nom)} ${esc(x.Prenom)}${x.NoteCuisine?`<span class="person-note-print">Note : ${esc(x.NoteCuisine)}</span>`:''}</td><td>${DAYS.find(d=>d.key===x.Jour)?.short||x.Jour}</td><td>${pill(x.Regime,'diet')}</td><td>${pill(x.Texture,'texture')}</td>${type==='Pique-nique'?`<td>${esc(x.Pain||'Pain')}</td><td>${esc(x.OptionPique||'Standard')}</td>`:''}<td>${esc(x.HeureRetrait||'—')}</td></tr>`).join('')}</tbody></table></section>`}
 
 function fitDetailDensity(){
+  // V29 — la page 2 est impérativement A4 portrait et doit rester sur UNE seule page.
+  // On compacte d'abord le détail, puis on mesure réellement son contenu et on réduit
+  // automatiquement l'ensemble si nécessaire. Aucun tableau n'est envoyé sur une page 3.
+  const scaleEl=$('detailScale');
+  const page=$('printDetailPage');
+  if(!scaleEl||!page)return;
   const count=uniquePeople(currentCommands()).length+currentCommands().filter(x=>['Plateau','Container','Pique-nique'].includes(x.TypeCommande)).length;
-  const el=$('printDetailPage');el.classList.remove('d0','d1','d2','d3','d4');
-  const cls=count<=15?'d0':count<=22?'d1':count<=30?'d2':count<=40?'d3':'d4';el.classList.add(cls);
-  const css={d0:['7.3pt','1.1mm','1'],d1:['6.9pt','.9mm','1'],d2:['6.4pt','.72mm','.96'],d3:['5.9pt','.55mm','.88'],d4:['5.4pt','.4mm','.78']}[cls];
-  $('detailScale').style.setProperty('--df',css[0]);$('detailScale').style.setProperty('--dp',css[1]);
-  $('detailScale').style.zoom=css[2];
-  $('detailScale').style.width=`${100/Number(css[2])}%`;
-  const style=$('dynamicPrintStyle')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'dynamicPrintStyle'}));
-  style.textContent=`.page-detail #detailScale table{font-size:${css[0]}} .page-detail #detailScale th,.page-detail #detailScale td{padding:${css[1]} 1mm}.page-detail #detailScale .print-section{margin:${count>30?'1.1mm':'1.8mm'} 0}.page-detail #detailScale .print-section-title{font-size:${count>30?'8pt':'9.5pt'};padding:${count>30?'.8mm':'1.2mm'} 2mm}`;
-}
+  page.classList.remove('d0','d1','d2','d3','d4');
+  const cls=count<=15?'d0':count<=22?'d1':count<=30?'d2':count<=40?'d3':'d4';
+  page.classList.add(cls);
 
+  // Base volontairement compacte : le portrait offre moins de largeur que l'ancien paysage.
+  const base={
+    d0:['6.2pt','.70mm'],d1:['5.9pt','.58mm'],d2:['5.5pt','.46mm'],
+    d3:['5.1pt','.36mm'],d4:['4.7pt','.28mm']
+  }[cls];
+  scaleEl.style.zoom='1';
+  scaleEl.style.width='100%';
+  const style=$('dynamicPrintStyle')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'dynamicPrintStyle'}));
+  style.textContent=`
+    .page-detail #detailScale table{font-size:${base[0]}}
+    .page-detail #detailScale th,.page-detail #detailScale td{padding:${base[1]} .45mm}
+    .page-detail #detailScale .print-section{margin:.65mm 0}
+    .page-detail #detailScale .print-section-title{font-size:7pt;padding:.45mm 1mm}
+    .page-detail #detailScale .legend-wrap{font-size:5.2pt;gap:3mm;margin-top:.6mm}
+    .page-detail #detailScale .print-comment{font-size:5.3pt;min-height:0;padding:.7mm;margin-top:.6mm}
+    .page-detail #detailScale .person-note-print{font-size:4.6pt;margin-top:0}
+    .page-detail #detailScale .detail-person-table .name{max-width:25mm}
+    .page-detail #detailScale .special-grid-print{gap:.7mm}
+  `;
+
+  // Dimensions utiles de la zone détail dans une page A4 portrait (après en-tête/pied).
+  // Mesure réelle : si le contenu dépasse en hauteur OU en largeur, on applique le plus
+  // petit coefficient. Une petite marge de sécurité évite les débordements à l'impression.
+  const availableWidth=186;  // mm, largeur intérieure après marges/padding
+  const availableHeight=248; // mm, espace entre en-tête et pied de page
+  const pxPerMm=96/25.4;
+  const naturalWidth=Math.max(scaleEl.scrollWidth,scaleEl.getBoundingClientRect().width);
+  const naturalHeight=Math.max(scaleEl.scrollHeight,scaleEl.getBoundingClientRect().height);
+  const fitW=(availableWidth*pxPerMm)/Math.max(naturalWidth,1);
+  const fitH=(availableHeight*pxPerMm)/Math.max(naturalHeight,1);
+  const zoom=Math.min(1,fitW,fitH)*0.985;
+  scaleEl.style.zoom=String(Math.max(0.48,zoom));
+  scaleEl.style.width=`${100/Math.max(0.48,zoom)}%`;
+}
 function legendsHtml(){return `<div class="legend-wrap"><div><b>Légende des régimes :</b><div class="legend">${DIETS.map(x=>pill(x,'diet')).join(' ')}</div></div><div><b>Légende des textures :</b><div class="legend">${TEXTURES.map(x=>pill(x,'texture')).join(' ')}</div></div></div>`}
 function pill(value,kind){const cls=dotClass(value,kind);return `${cls?`<span class="dot ${cls}"></span>`:''}${esc(value||'')}`}
 function dotClass(v,kind){const n=norm(v);if(kind==='diet'){if(n==='hypocalorique')return'dot-hypo';if(n==='hypolipidique')return'';if(n==='sans porc')return'dot-pork';if(n==='sans viande')return'dot-meat';return''}if(n==='purée lisse')return'dot-puree';if(n==='haché lubrifié')return'dot-hache';return''}
@@ -942,10 +976,49 @@ async function createOutlookDraft(e){e.preventDefault();const check=validateCurr
 async function buildPdfBlob(){
   if(!window.html2canvas||!window.jspdf?.jsPDF)throw new Error('Bibliothèques PDF indisponibles. Vérifiez l’accès internet du widget.');
   renderPrint();fitDetailDensity();
-  const {jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const s=await html2canvas($('printSummaryPage'),{scale:2,backgroundColor:'#ffffff'});pdf.addImage(s.toDataURL('image/jpeg',0.96),'JPEG',0,0,210,297);
-  pdf.addPage('a4','landscape');const d=await html2canvas($('printDetailPage'),{scale:2,backgroundColor:'#ffffff'});pdf.addImage(d.toDataURL('image/jpeg',0.96),'JPEG',0,0,297,210);
-  return pdf.output('blob')
+
+  // V28 : #printArea est volontairement masqué à l’écran. html2canvas renvoie une
+  // page vide lorsqu’on lui donne directement un descendant de display:none.
+  // On clone donc la zone d’impression dans un hôte hors écran, visible pour le
+  // moteur de rendu mais invisible pour l’utilisateur. Le DOM original reste intact.
+  const source=$('printArea');
+  if(!source)throw new Error('Zone d’impression introuvable.');
+  const host=document.createElement('div');
+  host.id='pdfCaptureHost';
+  const clone=source.cloneNode(true);
+  // Les id du clone ne doivent jamais être utilisés par le reste du widget.
+  clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+  clone.removeAttribute('id');
+  clone.style.display='block';
+  const pages=clone.querySelectorAll('.print-page');
+  if(pages.length<2)throw new Error('Les deux pages PDF n’ont pas pu être préparées.');
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  try{
+    // Attendre deux frames garantit que styles, dimensions et images sont calculés.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const imgs=[...host.querySelectorAll('img')].filter(img=>!img.hidden&&img.getAttribute('src'));
+    await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
+
+    const summary=pages[0],detail=pages[1];
+    if(summary.getBoundingClientRect().width<10||summary.getBoundingClientRect().height<10)throw new Error('La page récapitulative PDF n’a pas de dimensions.');
+    if(detail.getBoundingClientRect().width<10||detail.getBoundingClientRect().height<10)throw new Error('La page détail PDF n’a pas de dimensions.');
+
+    const captureOptions={scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,scrollX:0,scrollY:0};
+    const summaryCanvas=await html2canvas(summary,captureOptions);
+    const detailCanvas=await html2canvas(detail,captureOptions);
+    if(!summaryCanvas.width||!summaryCanvas.height||!detailCanvas.width||!detailCanvas.height)throw new Error('La capture PDF est vide.');
+
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+    pdf.addImage(summaryCanvas.toDataURL('image/jpeg',0.96),'JPEG',0,0,210,297,undefined,'FAST');
+    pdf.addPage('a4','portrait');
+    pdf.addImage(detailCanvas.toDataURL('image/jpeg',0.96),'JPEG',0,0,210,297,undefined,'FAST');
+    return pdf.output('blob');
+  }finally{
+    host.remove();
+  }
 }
 async function downloadPdf(){try{const blob=await buildPdfBlob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=pdfFileName();a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);await markWeekEvent('PdfLeDT','PDF généré');toast('PDF créé.')}catch(err){toast(err.message+' Utilisez le bouton Imprimer pour enregistrer en PDF.')}}
 function pdfFileName(){return `SAJ-commande-repas-${weekKey(weekStart)}.pdf`}
