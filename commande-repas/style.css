@@ -867,3 +867,21 @@
 .page-detail .detail-person-table td,.page-detail .detail-person-table th{white-space:nowrap}
 .page-detail .detail-person-table .name{max-width:25mm}
 .page-detail #detailScale{transform-origin:top left}
+
+
+/* V30 — impression détail : lisibilité maximale en A4 portrait sur une seule page. */
+.page-detail #detailScale{width:100%;overflow:visible}
+.page-detail #detailScale table{width:100%;border:1px solid #9fb0bd;border-collapse:collapse}
+.page-detail #detailScale th,.page-detail #detailScale td{border:1px solid #9fb0bd}
+.page-detail #detailScale table tr > *:last-child{border-right:1px solid #7f94a3!important}
+.page-detail #detailScale table tr:last-child > *{border-bottom:1px solid #7f94a3!important}
+.page-detail #detailScale .detail-person-table{table-layout:fixed;width:100%}
+.page-detail #detailScale .detail-person-table th,.page-detail #detailScale .detail-person-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media print{
+  .page-detail #detailScale{width:100%!important;max-height:250mm;overflow:hidden}
+  .page-detail #detailScale table{width:100%!important;border:1px solid #7f94a3!important}
+  .page-detail #detailScale table tr > *:last-child{border-right:1px solid #7f94a3!important}
+}
+
+/* V31 — profil alimentaire combiné au récapitulatif : un repas = un seul comptage. */
+.profile-plus{font-weight:700;padding:0 .6mm;color:#46515a}
