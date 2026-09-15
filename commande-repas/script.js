@@ -21,6 +21,9 @@ let repartitions=[],rooms=[];
 let saveTimer=null;
 let lastVisibleOrderSnapshot=[];
 let lastVisibleProfileSnapshot=[];
+// V36 — source unique et sérialisation des profils régime/texture.
+let liveProfileOverrides=new Map();
+let profileWriteQueue=Promise.resolve();
 let archiveEditUnlocked=false;
 let screenGroupSort={RDC:'name','1er étage':'name',Professionnel:'name','Stagiaire / Visiteur':'name'};
 let templateGroupSort={RDC:'name','1er étage':'name',Professionnel:'name'};
@@ -451,9 +454,11 @@ function summaryGroup(group,band,totalClass,c){
   const title=group==='Professionnel'?'PROFESSIONNELS':group;
 
   const profileKey=x=>{
-    const diet=canonicalDiet(x.Regime||'Normal')||'Normal';
+    const personRows=rows.filter(r=>r.PersonKey===x.PersonKey);
+    const eff=effectiveProfile(x.PersonKey,personRows);
+    const diet=eff.Regime;
     if(group==='Professionnel') return `D|${diet}`;
-    const texture=canonicalTexture(x.Texture||'Normale')||'Normale';
+    const texture=eff.Texture;
     return `P|${diet}|${texture}`;
   };
   const profileLabel=key=>{
@@ -515,13 +520,15 @@ function detailGroup(group,c){
 function specialDetail(type,c){const rows=c.filter(x=>x.TypeCommande===type).sort((a,b)=>dayIndex(a.Jour)-dayIndex(b.Jour)||comparePeople(a,b));if(!rows.length)return'';const band=type==='Plateau'?'band-tray':type==='Container'?'band-container':'band-picnic';const title=type==='Pique-nique'?'PIQUE-NIQUES':type.toUpperCase()+'S';return `<section class="print-section"><div class="print-section-title ${band}">${title}</div><table><thead><tr><th>Nom – Prénom</th><th>Jour</th><th>Régime</th><th>Texture</th>${type==='Pique-nique'?'<th>Pain</th><th>Option</th>':''}<th>Heure</th></tr></thead><tbody>${rows.map(x=>`<tr><td class="name">${esc(x.Nom)} ${esc(x.Prenom)}${x.NoteCuisine?`<span class="person-note-print">Note : ${esc(x.NoteCuisine)}</span>`:''}</td><td>${DAYS.find(d=>d.key===x.Jour)?.short||x.Jour}</td><td>${pill(x.Regime,'diet')}</td><td>${pill(x.Texture,'texture')}</td>${type==='Pique-nique'?`<td>${esc(x.Pain||'Pain')}</td><td>${esc(x.OptionPique||'Standard')}</td>`:''}<td>${esc(x.HeureRetrait||'—')}</td></tr>`).join('')}</tbody></table></section>`}
 
 function fitDetailDensity(){
-  // V30 — DÉTAIL : A4 PORTRAIT, UNE SEULE PAGE, priorité à la lisibilité.
-  // La largeur est maîtrisée par un tableau à colonnes fixes : on ne réduit plus
-  // toute la page à cause d'une cellule longue. On n'applique une réduction
-  // complémentaire que si la HAUTEUR réelle dépasse la zone imprimable.
+  // V37 — DÉTAIL : A4 PORTRAIT, UNE SEULE PAGE, sans aucune ligne coupée.
+  // La zone d'impression est normalement display:none à l'écran. Pour calculer
+  // correctement la hauteur, on la rend donc temporairement hors écran aux
+  // dimensions EXACTES de la zone imprimable A4 (198 x 285 mm), puis on calcule
+  // le zoom nécessaire pour faire tenir tout le contenu au-dessus du pied de page.
   const scaleEl=$('detailScale');
   const page=$('printDetailPage');
-  if(!scaleEl||!page)return;
+  const printArea=$('printArea');
+  if(!scaleEl||!page||!printArea)return;
 
   const peopleCount=uniquePeople(currentCommands()).length;
   const specialCount=currentCommands().filter(x=>['Plateau','Container','Pique-nique'].includes(x.TypeCommande)).length;
@@ -535,11 +542,9 @@ function fitDetailDensity(){
     d3:['6.1pt','.52mm'],d4:['5.8pt','.42mm']
   }[cls];
 
-  scaleEl.style.zoom='1';
-  scaleEl.style.width='100%';
   const style=$('dynamicPrintStyle')||document.head.appendChild(Object.assign(document.createElement('style'),{id:'dynamicPrintStyle'}));
   style.textContent=`
-    .page-detail #detailScale{width:100%!important;overflow:visible}
+    .page-detail #detailScale{width:100%!important;max-height:none!important;overflow:visible!important;transform-origin:top left}
     .page-detail #detailScale table{font-size:${base[0]};width:100%;table-layout:fixed;border:1px solid #9fb0bd;border-collapse:collapse}
     .page-detail #detailScale th,.page-detail #detailScale td{padding:${base[1]} .35mm;border:1px solid #9fb0bd;line-height:1.08;overflow:hidden;text-overflow:ellipsis}
     .page-detail #detailScale .detail-person-table th:nth-child(1),.page-detail #detailScale .detail-person-table td:nth-child(1){width:27mm}
@@ -547,25 +552,62 @@ function fitDetailDensity(){
     .page-detail #detailScale .detail-person-table th:nth-child(3),.page-detail #detailScale .detail-person-table td:nth-child(3){width:11mm}
     .page-detail #detailScale .detail-person-table th:nth-child(4),.page-detail #detailScale .detail-person-table td:nth-child(4){width:21mm}
     .page-detail #detailScale .detail-person-table .name{max-width:none;white-space:nowrap}
-    .page-detail #detailScale .print-section{margin:.9mm 0}
-    .page-detail #detailScale .print-section-title{font-size:7.8pt;padding:.55mm 1mm}
-    .page-detail #detailScale .legend-wrap{font-size:5.7pt;gap:3mm;margin-top:.8mm}
-    .page-detail #detailScale .print-comment{font-size:5.8pt;min-height:0;padding:.8mm;margin-top:.8mm}
-    .page-detail #detailScale .person-note-print{font-size:4.8pt;margin-top:0}
-    .page-detail #detailScale .special-grid-print{gap:.8mm}
+    .page-detail #detailScale .print-section{margin:.75mm 0}
+    .page-detail #detailScale .print-section-title{font-size:7.7pt;padding:.48mm 1mm}
+    .page-detail #detailScale .legend-wrap{font-size:5.6pt;gap:2.5mm;margin-top:.65mm}
+    .page-detail #detailScale .print-comment{font-size:5.7pt;min-height:0;padding:.65mm;margin-top:.65mm}
+    .page-detail #detailScale .person-note-print{font-size:4.7pt;margin-top:0}
+    .page-detail #detailScale .special-grid-print{gap:.65mm}
     .page-detail #detailScale .special-grid-print table{table-layout:auto}
+    .page-detail #detailScale table tr > *:last-child{border-right:1px solid #7f94a3!important}
+    .page-detail #detailScale table tr:last-child > *{border-bottom:1px solid #7f94a3!important}
   `;
 
-  // L'en-tête et le pied sont déjà hors de detailScale. On utilise presque toute
-  // la hauteur disponible afin d'éviter la grande zone blanche observée en V29.
-  const availableHeight=250;
-  const pxPerMm=96/25.4;
-  const naturalHeight=Math.max(scaleEl.scrollHeight,scaleEl.getBoundingClientRect().height);
-  const fitH=(availableHeight*pxPerMm)/Math.max(naturalHeight,1);
-  const zoom=Math.min(1,fitH*0.995);
-  // Ne pas descendre inutilement : les classes de densité ont déjà compacté les lignes.
-  scaleEl.style.zoom=String(Math.max(0.72,zoom));
-  scaleEl.style.width='100%';
+  // Sauvegarder l'état normal de la zone, puis la rendre mesurable hors écran.
+  const savedAreaStyle=printArea.getAttribute('style');
+  const savedPageStyle=page.getAttribute('style');
+  const savedZoom=scaleEl.style.zoom;
+  try{
+    printArea.style.cssText='display:block!important;position:fixed;left:-30000px;top:0;visibility:hidden;z-index:-99999;width:198mm;';
+    page.style.cssText='display:block;box-sizing:border-box;width:198mm;height:285mm;overflow:hidden;position:relative;';
+    scaleEl.style.zoom='1';
+    scaleEl.style.width='100%';
+    scaleEl.style.maxHeight='none';
+    scaleEl.style.overflow='visible';
+
+    // La limite basse est le haut du pied de page, pas une valeur arbitraire.
+    const footer=page.querySelector('footer');
+    const pageRect=page.getBoundingClientRect();
+    const scaleRect=scaleEl.getBoundingClientRect();
+    const footerRect=footer?.getBoundingClientRect();
+    const footerTop=footerRect?.top||pageRect.bottom;
+    const availablePx=Math.max(1,footerTop-scaleRect.top-4); // petite marge de sécurité
+    const naturalPx=Math.max(scaleEl.scrollHeight,scaleEl.getBoundingClientRect().height,1);
+    let zoom=Math.min(1,(availablePx/naturalPx)*0.985);
+
+    // On ne fixe volontairement aucune limite minimale : l'absolu demandé est
+    // que toutes les lignes, y compris la fin des professionnels, soient visibles.
+    zoom=Math.max(0.20,zoom);
+    scaleEl.style.zoom=String(zoom);
+
+    // Contrôle final avec la hauteur réellement rendue. Si le navigateur arrondit
+    // différemment, on réduit par petits pas jusqu'à ce que tout tienne.
+    for(let i=0;i<12;i++){
+      const rendered=scaleEl.getBoundingClientRect().height;
+      if(rendered<=availablePx+0.5)break;
+      zoom*=0.97;
+      scaleEl.style.zoom=String(zoom);
+    }
+  }finally{
+    // Conserver uniquement le zoom calculé ; restaurer le reste de l'état écran.
+    const finalZoom=scaleEl.style.zoom||savedZoom||'1';
+    if(savedAreaStyle===null)printArea.removeAttribute('style');else printArea.setAttribute('style',savedAreaStyle);
+    if(savedPageStyle===null)page.removeAttribute('style');else page.setAttribute('style',savedPageStyle);
+    scaleEl.style.zoom=finalZoom;
+    scaleEl.style.width='100%';
+    scaleEl.style.maxHeight='none';
+    scaleEl.style.overflow='visible';
+  }
 }
 function legendsHtml(){return `<div class="legend-wrap"><div><b>Légende des régimes :</b><div class="legend">${DIETS.map(x=>pill(x,'diet')).join(' ')}</div></div><div><b>Légende des textures :</b><div class="legend">${TEXTURES.map(x=>pill(x,'texture')).join(' ')}</div></div></div>`}
 function pill(value,kind){const cls=dotClass(value,kind);return `${cls?`<span class="dot ${cls}"></span>`:''}${esc(value||'')}`}
@@ -671,17 +713,109 @@ function profileSelectHtml(p,field,isGuest=false){
   const cls=(field==='Regime'?'profile-diet-select':'profile-texture-select')+' '+profileValueClass(value,field);
   return `<select class="inline-profile-select screen-profile-select ${cls}" data-profile-id="${id}" data-profile-key="${esc(p.PersonKey)}" data-profile-field="${field}" data-profile-guest="${isGuest?'1':'0'}">${opts}</select>`;
 }
+
+function rememberLiveProfile(personKey,field,value){
+  if(!personKey||!['Regime','Texture'].includes(field))return;
+  const prev=liveProfileOverrides.get(personKey)||{};
+  liveProfileOverrides.set(personKey,{...prev,[field]:value});
+}
+function visibleProfileSnapshot(rootSelector='#editor'){
+  const byPerson=new Map();
+  document.querySelectorAll(`${rootSelector} .screen-profile-select`).forEach(sel=>{
+    const personKey=sel.dataset.profileKey||'';if(!personKey)return;
+    const item=byPerson.get(personKey)||{PersonKey:personKey,isGuest:sel.dataset.profileGuest==='1',guestId:+sel.dataset.profileId||0,configId:+sel.dataset.profileId||0};
+    const field=sel.dataset.profileField;
+    if(field==='Regime'||field==='Texture')item[field]=sel.value;
+    byPerson.set(personKey,item);
+    rememberLiveProfile(personKey,field,sel.value);
+  });
+  return [...byPerson.values()];
+}
+function applyProfileSnapshotToMemory(snapshot){
+  for(const item of snapshot||[]){
+    const fields={};
+    if(item.Regime!=null)fields.Regime=item.Regime;
+    if(item.Texture!=null)fields.Texture=item.Texture;
+    if(!Object.keys(fields).length)continue;
+    const cfg=config.find(x=>x.PersonKey===item.PersonKey);if(cfg)Object.assign(cfg,fields);
+    const gst=guests.find(x=>x.PersonKey===item.PersonKey);if(gst)Object.assign(gst,fields);
+    commands.filter(x=>x.SemaineKey===weekKey(weekStart)&&x.PersonKey===item.PersonKey).forEach(x=>Object.assign(x,fields));
+    Object.entries(fields).forEach(([f,v])=>rememberLiveProfile(item.PersonKey,f,v));
+  }
+}
+function effectiveProfile(personKey,rows=[]){
+  const override=liveProfileOverrides.get(personKey)||{};
+  const cfg=config.find(x=>x.PersonKey===personKey);
+  const choose=(field,canon,fallback)=>{
+    if(override[field]!=null)return canon(override[field])||fallback;
+    const vals=(rows||[]).map(r=>canon(r?.[field])).filter(Boolean);
+    if(vals.length){const counts=new Map();vals.forEach(v=>counts.set(v,(counts.get(v)||0)+1));return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0][0]}
+    return canon(cfg?.[field])||fallback;
+  };
+  return {Regime:choose('Regime',canonicalDiet,'Normal'),Texture:choose('Texture',canonicalTexture,'Normale')};
+}
+async function persistProfileSnapshot(snapshot,{propagateFuture=false}={}){
+  if(!snapshot?.length)return 0;
+  const actions=[];
+  for(const item of snapshot){
+    const fields={};
+    if(item.Regime!=null)fields.Regime=canonicalDiet(item.Regime)||'Normal';
+    if(item.Texture!=null)fields.Texture=canonicalTexture(item.Texture)||'Normale';
+    if(!Object.keys(fields).length)continue;
+    if(item.isGuest){
+      const g=guests.find(x=>x.PersonKey===item.PersonKey)||guests.find(x=>+x.id===+item.guestId);
+      if(g){actions.push(['UpdateRecord',TABLES.guests,g.id,fields]);commands.filter(c=>c.SemaineKey===g.SemaineKey&&c.PersonKey===g.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,fields]))}
+    }else{
+      const p=config.find(x=>x.PersonKey===item.PersonKey)||config.find(x=>+x.id===+item.configId);
+      if(p){actions.push(['UpdateRecord',TABLES.config,p.id,fields]);commands.filter(c=>c.SemaineKey===weekKey(weekStart)&&c.PersonKey===p.PersonKey).forEach(c=>actions.push(['UpdateRecord',TABLES.cmd,c.id,fields]))}
+    }
+  }
+  if(actions.length)await grist.docApi.applyUserActions(actions);
+  applyProfileSnapshotToMemory(snapshot);
+  if(actions.length)await touchWeek(true);
+  if(propagateFuture){
+    for(const item of snapshot.filter(x=>!x.isGuest))await syncConfigToFutureWeeks(item.PersonKey,{updateProfile:true,excludeWeek:weekKey(weekStart)});
+  }
+  return actions.length;
+}
+async function reloadAndVerifyProfiles(snapshot,attempts=3){
+  let lastErr=null;
+  for(let i=0;i<attempts;i++){
+    await loadAll();
+    // Toujours réappliquer le snapshot validé à la mémoire d'impression : cela élimine
+    // tout décalage de cache/rafraîchissement entre Grist et le rendu PDF/impression.
+    applyProfileSnapshotToMemory(snapshot);
+    try{
+      for(const expected of snapshot||[]){
+        const rows=currentCommands().filter(r=>r.PersonKey===expected.PersonKey);
+        if(!rows.length)continue;
+        for(const row of rows){
+          if(expected.Regime!=null&&canonicalDiet(row.Regime)!==canonicalDiet(expected.Regime))throw new Error(`Régime non relu pour ${row.Nom||expected.PersonKey}`);
+          if(expected.Texture!=null&&canonicalTexture(row.Texture)!==canonicalTexture(expected.Texture))throw new Error(`Texture non relue pour ${row.Nom||expected.PersonKey}`);
+        }
+      }
+      return;
+    }catch(err){lastErr=err;if(i<attempts-1)await new Promise(r=>setTimeout(r,120*(i+1)))}
+  }
+  // Les actions Grist ont réussi mais une relecture peut être momentanément en retard.
+  // On conserve le snapshot utilisateur en mémoire pour garantir un rendu fidèle.
+  if(lastErr)console.warn('Relecture profil retardée, snapshot écran conservé pour le rendu',lastErr);
+}
 async function saveScreenProfileField(e){
   const field=e.target.dataset.profileField,value=e.target.value,isGuest=e.target.dataset.profileGuest==='1';
   e.target.classList.remove('profile-normal','profile-brown','profile-purple','profile-yellow','profile-green','profile-red');
   const liveClass=profileValueClass(value,field);if(liveClass)e.target.classList.add(liveClass);
   const personKey=e.target.dataset.profileKey||'';
-  try{
-    await persistProfileValue({personKey,field,value,isGuest,guestId:+e.target.dataset.profileId,propagateFuture:!isGuest});
-    await loadAll();renderAll();showSavedState();
-  }catch(err){console.error(err);toast('Échec de l’enregistrement du profil : '+err.message)}
+  rememberLiveProfile(personKey,field,value);
+  const snapshot=[{PersonKey:personKey,isGuest,guestId:+e.target.dataset.profileId||0,configId:+e.target.dataset.profileId||0,[field]:value}];
+  // Sérialiser les écritures : un clic Enregistrer/Imprimer ne peut plus doubler une écriture onchange.
+  profileWriteQueue=profileWriteQueue.then(async()=>{
+    await persistProfileSnapshot(snapshot,{propagateFuture:!isGuest});
+    await reloadAndVerifyProfiles(snapshot);
+    renderPrint();showSavedState();
+  }).catch(err=>{console.error(err);toast('Échec de l’enregistrement du profil : '+err.message)});
+  await profileWriteQueue;
 }
-
 
 async function persistProfileValue({personKey,field,value,isGuest=false,guestId=0,configId=0,propagateFuture=false}){
   if(!personKey||!['Groupe','Regime','Texture'].includes(field))return 0;
@@ -709,92 +843,42 @@ async function persistProfileValue({personKey,field,value,isGuest=false,guestId=
 }
 
 async function flushVisibleProfileSelections(){
-  const byPerson=new Map();lastVisibleProfileSnapshot=[];
-  document.querySelectorAll('#editor .screen-profile-select').forEach(sel=>{
-    const personKey=sel.dataset.profileKey||'';if(!personKey)return;
-    const item=byPerson.get(personKey)||{personKey,isGuest:sel.dataset.profileGuest==='1',guestId:+sel.dataset.profileId,configId:+sel.dataset.profileId};
-    item[sel.dataset.profileField]=sel.value;byPerson.set(personKey,item);
-  });
-  let changes=0;
-  for(const item of byPerson.values()){
-    const fields={};
-    if(item.Regime!=null)fields.Regime=item.Regime;
-    if(item.Texture!=null)fields.Texture=item.Texture;
-    for(const [field,value] of Object.entries(fields)){
-      changes+=await persistProfileValue({personKey:item.personKey,field,value,isGuest:item.isGuest,guestId:item.guestId,configId:item.configId,propagateFuture:false});
-    }
-    lastVisibleProfileSnapshot.push({PersonKey:item.personKey,...fields});
-  }
-  if(changes)await loadAll();
+  // Attendre une éventuelle sauvegarde déclenchée par onchange avant de prendre le snapshot final.
+  await profileWriteQueue;
+  const snapshot=visibleProfileSnapshot('#editor');
+  lastVisibleProfileSnapshot=snapshot.map(x=>({...x}));
+  const changes=await persistProfileSnapshot(snapshot,{propagateFuture:false});
+  // On met à jour la mémoire immédiatement, puis on relit Grist avec contrôle.
+  applyProfileSnapshotToMemory(snapshot);
+  if(changes)await reloadAndVerifyProfiles(snapshot);
   return changes;
 }
 
 function verifyVisibleProfileSnapshot(){
   if(!lastVisibleProfileSnapshot.length)return;
-  const current=currentCommands();
   for(const expected of lastVisibleProfileSnapshot){
-    const rows=current.filter(r=>r.PersonKey===expected.PersonKey);
+    const rows=currentCommands().filter(r=>r.PersonKey===expected.PersonKey);
     if(!rows.length)continue;
-    for(const row of rows){
-      if(expected.Regime!=null&&canonicalDiet(row.Regime)!==canonicalDiet(expected.Regime))throw new Error(`Contrôle d’enregistrement du régime échoué pour ${row.Nom||expected.PersonKey}.`);
-      if(expected.Texture!=null&&canonicalTexture(row.Texture)!==canonicalTexture(expected.Texture))throw new Error(`Contrôle d’enregistrement de la texture échoué pour ${row.Nom||expected.PersonKey}.`);
-    }
+    const eff=effectiveProfile(expected.PersonKey,rows);
+    if(expected.Regime!=null&&canonicalDiet(eff.Regime)!==canonicalDiet(expected.Regime))throw new Error(`Contrôle d’enregistrement du régime échoué pour ${rows[0]?.Nom||expected.PersonKey}.`);
+    if(expected.Texture!=null&&canonicalTexture(eff.Texture)!==canonicalTexture(expected.Texture))throw new Error(`Contrôle d’enregistrement de la texture échoué pour ${rows[0]?.Nom||expected.PersonKey}.`);
   }
 }
 
 async function prepareCurrentWeekForOutput(){
-  // Important : l'utilisateur peut cliquer sur Imprimer/PDF immédiatement après avoir
-  // changé un menu. On relit donc le DOM, on force l'écriture Grist, puis on recharge
-  // les tables avant de construire l'impression. L'écran, l'impression et le PDF
-  // utilisent ainsi exactement les mêmes données.
+  // V36 : la source de vérité du rendu est le dernier état visible validé par l'utilisateur.
+  // On attend toutes les écritures, on enregistre repas + profils, puis on réapplique le
+  // snapshot au modèle en mémoire avant de construire l'impression/PDF.
+  await profileWriteQueue;
   await flushVisibleOrderSelections();
   await flushVisibleProfileSelections();
   await loadAll();
+  applyProfileSnapshotToMemory(lastVisibleProfileSnapshot);
   verifyVisibleOrderSnapshot();
   verifyVisibleProfileSnapshot();
   renderCommande();
-}
-
-function renderHistory(){
-  const today=mondayOf(new Date());
-  const pastWeeks=[...weeks].filter(w=>{const d=parseKey(w.SemaineKey);return isValidDate(d)&&d<today;});
-  const years=[...new Set(pastWeeks.map(weekYearOf))].sort((a,b)=>b-a);
-  const current=$('historyYear')?.value||'all';
-  $('historyYear').innerHTML=`<option value="all">Toutes</option>${years.map(y=>`<option value="${y}" ${String(y)===String(current)?'selected':''}>${y}</option>`).join('')}`;
-  if(current!=='all'&&!years.includes(+current)) $('historyYear').value='all';
-  const filter=$('historyYear').value;
-  const rows=pastWeeks.filter(w=>filter==='all'||weekYearOf(w)===+filter).sort((a,b)=>b.SemaineKey.localeCompare(a.SemaineKey));
-  $('historyList').innerHTML=`<div class="history-head"><span>Semaine</span><span>Année</span><span>Statut</span><span>Dernière modification</span></div>`+(rows.map(w=>`<div class="history-row"><button data-history="${w.SemaineKey}">${weekLabel(parseKey(w.SemaineKey))}</button><span>${weekYearOf(w)}</span><span class="status ${statusClass(effectiveWeekStatus(w))}">${esc(w.Rectificative?'Rectificative':effectiveWeekStatus(w))}</span><span>${esc(lastModifiedText(w))}</span></div>`).join('')||'<p>Aucune commande passée dans l’historique.</p>');
-  document.querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>{openWeek(b.dataset.history);switchTab('commande')});
-}
-
-function renderSettings(){
-  let rows=[...config];
-  if(settingsGroupFilter!=='all')rows=rows.filter(p=>p.Groupe===settingsGroupFilter);
-  if(settingsActiveFilter==='active')rows=rows.filter(p=>p.Actif!==false);
-  if(settingsActiveFilter==='inactive')rows=rows.filter(p=>p.Actif===false);
-  rows=sortPeopleSimple(rows,settingsSort);
-  const groupOptions=v=>['RDC','1er étage','Professionnel'].map(x=>`<option value="${x}" ${v===x?'selected':''}>${x==='Professionnel'?'Professionnels':x}</option>`).join('');
-  const dietOptions=v=>DIETS.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
-  const textureOptions=v=>TEXTURES.map(x=>`<option value="${x}" ${v===x?'selected':''}>${x}</option>`).join('');
-  $('peopleSettings').innerHTML=`<div class="list-controls"><label>Groupe <select id="settingsGroupFilter"><option value="all">Tous</option><option value="RDC" ${settingsGroupFilter==='RDC'?'selected':''}>RDC</option><option value="1er étage" ${settingsGroupFilter==='1er étage'?'selected':''}>1er étage</option><option value="Professionnel" ${settingsGroupFilter==='Professionnel'?'selected':''}>Professionnels</option></select></label><label>Actif <select id="settingsActiveFilter"><option value="all">Tous</option><option value="active" ${settingsActiveFilter==='active'?'selected':''}>Actifs</option><option value="inactive" ${settingsActiveFilter==='inactive'?'selected':''}>Inactifs</option></select></label><label>Trier par <select id="settingsSort"><option value="name" ${settingsSort==='name'?'selected':''}>Nom</option><option value="group" ${settingsSort==='group'?'selected':''}>Groupe</option><option value="diet" ${settingsSort==='diet'?'selected':''}>Régime</option><option value="texture" ${settingsSort==='texture'?'selected':''}>Texture</option><option value="active" ${settingsSort==='active'?'selected':''}>Actif</option></select></label></div><table class="settings-table"><thead><tr><th>Nom – Prénom</th><th>Groupe</th><th>Régime</th><th>Texture</th><th>Jours</th><th>Actif</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td><select class="inline-profile-select" data-profile-id="${p.id}" data-profile-field="Groupe">${groupOptions(p.Groupe)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Regime,'Regime')}" data-profile-id="${p.id}" data-profile-field="Regime">${dietOptions(p.Regime)}</select></td><td><select class="inline-profile-select ${profileValueClass(p.Texture,'Texture')}" data-profile-id="${p.id}" data-profile-field="Texture">${textureOptions(p.Texture)}</select></td><td>${DAYS.filter(d=>p[d.key]).map(d=>d.short).join(' ')}</td><td>${p.Actif!==false?'Oui':'Non'}</td><td><button class="mini" data-edit-person="${p.id}">Modifier</button> <button class="mini danger" data-toggle-person="${p.id}">${p.Actif!==false?'Désactiver':'Réactiver'}</button></td></tr>`).join('')}</tbody></table>`;
-  $('settingsGroupFilter').onchange=e=>{settingsGroupFilter=e.target.value;renderSettings()};
-  $('settingsActiveFilter').onchange=e=>{settingsActiveFilter=e.target.value;renderSettings()};
-  $('settingsSort').onchange=e=>{settingsSort=e.target.value;renderSettings()};
-  document.querySelectorAll('.inline-profile-select').forEach(el=>el.onchange=saveInlineProfileField);
-  document.querySelectorAll('[data-edit-person]').forEach(b=>b.onclick=()=>editPerson(+b.dataset.editPerson));document.querySelectorAll('[data-toggle-person]').forEach(b=>b.onclick=()=>togglePerson(+b.dataset.togglePerson));
-  const cls=[...closures].filter(x=>x.Actif!==false).sort((a,b)=>a.DateDebut.localeCompare(b.DateDebut));$('closureList').innerHTML=cls.length?`<table class="settings-table"><thead><tr><th>Du</th><th>Au</th><th>Motif</th><th></th></tr></thead><tbody>${cls.map(x=>`<tr><td>${frDate(parseKey(x.DateDebut))}</td><td>${frDate(parseKey(x.DateFin))}</td><td>${esc(x.Motif)}</td><td><button class="mini danger" data-remove-closure="${x.id}">Supprimer</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Aucune fermeture enregistrée.</p>';
-  document.querySelectorAll('[data-remove-closure]').forEach(b=>b.onclick=()=>removeClosure(+b.dataset.removeClosure));
-}
-async function saveInlineProfileField(e){
-  const id=+e.target.dataset.profileId,field=e.target.dataset.profileField,value=e.target.value;
-  e.target.classList.remove('profile-normal','profile-brown','profile-purple','profile-yellow','profile-green','profile-red');
-  const liveClass=profileValueClass(value,field);if(liveClass)e.target.classList.add(liveClass);
-  const p=config.find(x=>+x.id===id);if(!p)return;
-  try{
-    await persistProfileValue({personKey:p.PersonKey,field,value,isGuest:false,configId:id,propagateFuture:true});
-    await loadAll();renderAll();toast(`${field==='Groupe'?'Groupe':field==='Regime'?'Régime':'Texture'} modifié(e).`);
-  }catch(err){console.error(err);toast('Échec de l’enregistrement du profil : '+err.message)}
+  // renderCommande recrée le DOM mais ne doit pas modifier le snapshot d'impression.
+  applyProfileSnapshotToMemory(lastVisibleProfileSnapshot);
 }
 
 function renderTemplateEditor(){
@@ -1302,13 +1386,8 @@ function uniquePeopleForPrint(rows){
   rows.forEach(r=>{if(!groups.has(r.PersonKey))groups.set(r.PersonKey,[]);groups.get(r.PersonKey).push(r)});
   return [...groups.values()].map(rs=>{
     const base={...rs[0]};
-    const mode=(field,canon,fallback)=>{
-      const counts=new Map();
-      rs.forEach(r=>{const v=canon(r[field])||fallback;counts.set(v,(counts.get(v)||0)+1)});
-      return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0]||fallback;
-    };
-    base.Regime=mode('Regime',canonicalDiet,'Normal');
-    base.Texture=mode('Texture',canonicalTexture,'Normale');
+    const eff=effectiveProfile(base.PersonKey,rs);
+    base.Regime=eff.Regime;base.Texture=eff.Texture;
     return base;
   });
 }
