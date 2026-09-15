@@ -889,3 +889,6 @@
 
 /* V32 — message explicite en cas d’échec d’initialisation */
 .fatal-init-error{margin:12px 0;padding:12px 14px;border:2px solid #b91c1c;border-radius:8px;background:#fff1f1;color:#7f1d1d;font-size:13px;line-height:1.4}.fatal-init-error strong{font-size:14px}
+
+/* V34 — le bouton d'édition d'archive doit rester réellement invisible quand hidden est présent. */
+#unlockArchive[hidden]{display:none!important;}
