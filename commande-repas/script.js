@@ -471,13 +471,63 @@ async function updateCmd(id,fields,detail='Modification de repas'){
 }
 function pickFields(row,fields){const o={};Object.keys(fields).forEach(k=>o[k]=row?.[k]);return o}
 
+function isProfessionalPrintRow(row){return !!row&&(row.Groupe==='Professionnel'||row.SourceType==='Professionnel'||String(row.PersonKey||'').startsWith('P:'))}
+function professionalMustPrintAtRdc(diet){const d=norm(canonicalDiet(diet));return d==='sans viande'||d==='sans porc'}
+function preparePrintCommands(c){
+  // Impression uniquement : les professionnels restent inchangés dans le widget Grist.
+  // Sur le print, ils sont anonymisés puis intégrés au RDC / 1er étage pour les repas sur place.
+  const out=(c||[]).map(x=>({...x}));
+  const proRows=out.filter(isProfessionalPrintRow);
+  if(!proRows.length)return out;
+
+  const proPeople=uniquePeopleForPrint(proRows).sort(comparePeople);
+  const labels=new Map(proPeople.map((p,i)=>[p.PersonKey,`PRO-${i+1}`]));
+  const profiles=new Map(proPeople.map(p=>[p.PersonKey,effectiveProfile(p.PersonKey,proRows.filter(r=>r.PersonKey===p.PersonKey))]));
+
+  // Aucun nom de professionnel n'apparaît dans l'impression, y compris dans les blocs spéciaux.
+  proRows.forEach(r=>{r.PrintProfessional=true;r.Nom=labels.get(r.PersonKey)||'PRO';r.Prenom=''});
+
+  const weekTotals={RDC:0,'1er étage':0};
+  DAYS.forEach((day,dayPos)=>{
+    const dayRows=proRows.filter(r=>r.Jour===day.key&&r.TypeCommande==='Repas sur place');
+    const byPerson=new Map();
+    dayRows.forEach(r=>{if(!byPerson.has(r.PersonKey))byPerson.set(r.PersonKey,[]);byPerson.get(r.PersonKey).push(r)});
+    const people=[...byPerson.entries()].sort((a,b)=>(labels.get(a[0])||'').localeCompare(labels.get(b[0])||'','fr',{numeric:true}));
+    let rdcCount=0,floorCount=0;
+    const flexible=[];
+
+    people.forEach(([personKey,rows])=>{
+      const weight=rows.length;
+      const diet=profiles.get(personKey)?.Regime||'Normal';
+      if(professionalMustPrintAtRdc(diet)){
+        rows.forEach(r=>r.Groupe='RDC');
+        rdcCount+=weight;weekTotals.RDC+=weight;
+      }else flexible.push([personKey,rows]);
+    });
+
+    flexible.forEach(([personKey,rows],i)=>{
+      const weight=rows.length;
+      const diffIfRdc=Math.abs((rdcCount+weight)-floorCount);
+      const diffIfFloor=Math.abs(rdcCount-(floorCount+weight));
+      let target;
+      if(diffIfRdc<diffIfFloor)target='RDC';
+      else if(diffIfFloor<diffIfRdc)target='1er étage';
+      else if(weekTotals.RDC<weekTotals['1er étage'])target='RDC';
+      else if(weekTotals['1er étage']<weekTotals.RDC)target='1er étage';
+      else target=((dayPos+i)%2===0)?'RDC':'1er étage';
+      rows.forEach(r=>r.Groupe=target);
+      if(target==='RDC'){rdcCount+=weight;weekTotals.RDC+=weight}else{floorCount+=weight;weekTotals['1er étage']+=weight}
+    });
+  });
+  return out;
+}
 function renderPrint(){
-  const c=currentCommands();$('summaryContent').innerHTML=summaryHtml(c);$('detailContent').innerHTML=detailHtml(c);
+  const c=preparePrintCommands(currentCommands());$('summaryContent').innerHTML=summaryHtml(c);$('detailContent').innerHTML=detailHtml(c);
   applyLogoToPrint();
   const printed='Imprimé le '+new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date());const modified='Dernière modification : '+lastModifiedText(currentWeek());const stamp=`${modified} · ${printed}`;$('printStamp1').textContent=stamp;$('printStamp2').textContent=stamp;
 }
 function summaryHtml(c){
-  const parts=[];parts.push(summaryGroup('RDC','band-rdc','total-rdc',c),summaryGroup('1er étage','band-floor','total-floor',c),summaryGroup('Professionnel','band-pro','total-pro',c));
+  const parts=[];parts.push(summaryGroup('RDC','band-rdc','total-rdc',c),summaryGroup('1er étage','band-floor','total-floor',c));
   const guest=summaryGuests(c);if(guest)parts.push(guest);
   const special=specialSummaryCards(c);if(special)parts.push(special);
   parts.push(totalGeneral(c));
@@ -548,7 +598,7 @@ function specialSummaryCards(c){
 }
 function totalGeneral(c){const perDay=DAYS.map(d=>c.filter(x=>x.Jour===d.key&&x.TypeCommande!=='Absent'&&x.TypeCommande!=='Fermé').length);return `<section class="print-section"><table><thead><tr><th>TOTAL GÉNÉRAL</th>${DAYS.map((d,i)=>`<th>${d.short}<br>${dayMonth(addDays(weekStart,i))}</th>`).join('')}<th>Total</th></tr></thead><tbody><tr class="total-general"><td>Nombre de repas</td>${perDay.map(n=>`<td>${n}</td>`).join('')}<td>${perDay.reduce((a,b)=>a+b,0)}</td></tr></tbody></table></section>`}
 function detailHtml(c){
-  const parts=[];['RDC','1er étage','Professionnel'].forEach(g=>{const s=detailGroup(g,c);if(s)parts.push(s)});const guest=detailGroup('Stagiaire / Visiteur',c);if(guest)parts.push(guest);
+  const parts=[];['RDC','1er étage'].forEach(g=>{const s=detailGroup(g,c);if(s)parts.push(s)});const guest=detailGroup('Stagiaire / Visiteur',c);if(guest)parts.push(guest);
   const specials=['Plateau','Container','Pique-nique'].map(t=>specialDetail(t,c)).filter(Boolean);if(specials.length)parts.push(`<div class="special-grid-print">${specials.join('')}</div>`);
   parts.push(legendsHtml());const comment=currentWeek()?.Commentaire||'';parts.push(`<div class="print-comment"><b>Commentaires :</b> ${esc(comment)}</div>`);return parts.join('')
 }
@@ -1403,49 +1453,91 @@ async function createOutlookDraft(e){e.preventDefault();const check=validateCurr
 async function buildPdfBlob(){
   if(!window.html2canvas||!window.jspdf?.jsPDF)throw new Error('Bibliothèques PDF indisponibles. Vérifiez l’accès internet du widget.');
   await prepareCurrentWeekForOutput();
-  renderPrint();fitDetailDensity();
 
-  // V28 : #printArea est volontairement masqué à l’écran. html2canvas renvoie une
-  // page vide lorsqu’on lui donne directement un descendant de display:none.
-  // On clone donc la zone d’impression dans un hôte hors écran, visible pour le
-  // moteur de rendu mais invisible pour l’utilisateur. Le DOM original reste intact.
-  const source=$('printArea');
-  if(!source)throw new Error('Zone d’impression introuvable.');
-  const host=document.createElement('div');
-  host.id='pdfCaptureHost';
-  const clone=source.cloneNode(true);
-  // Les id du clone ne doivent jamais être utilisés par le reste du widget.
-  clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
-  clone.removeAttribute('id');
-  clone.style.display='block';
-  const pages=clone.querySelectorAll('.print-page');
-  if(pages.length<2)throw new Error('Les deux pages PDF n’ont pas pu être préparées.');
-  host.appendChild(clone);
-  document.body.appendChild(host);
+  // SOURCE UNIQUE : le PDF est créé à partir du NOUVEAU PRINT déjà généré.
+  // Aucune seconde mise en page, aucun second calcul des repas et aucune
+  // nouvelle répartition des professionnels ne sont effectués ici.
+  renderPrint();
+  fitDetailDensity();
+
+  const printArea=$('printArea');
+  const summary=$('printSummaryPage');
+  const detail=$('printDetailPage');
+  const summaryContent=$('summaryContent');
+  const detailScale=$('detailScale');
+  if(!printArea||!summary||!detail||!summaryContent||!detailScale)throw new Error('Zone d’impression incomplète.');
+
+  // Le navigateur imprime une page A4 avec 6 mm de marge, soit une zone utile
+  // EXACTE de 198 x 285 mm. Pour que « Créer le PDF » reproduise le print,
+  // on rend temporairement LE DOM DU PRINT lui-même hors écran avec ces mêmes
+  // dimensions, puis on capture chacune des deux pages sans les reconstruire.
+  const saveStyle=el=>el.getAttribute('style');
+  const restoreStyle=(el,value)=>{if(value===null)el.removeAttribute('style');else el.setAttribute('style',value)};
+  const saved={
+    area:saveStyle(printArea),
+    summary:saveStyle(summary),
+    detail:saveStyle(detail),
+    summaryContent:saveStyle(summaryContent),
+    detailScale:saveStyle(detailScale)
+  };
 
   try{
-    // Attendre deux frames garantit que styles, dimensions et images sont calculés.
+    printArea.style.cssText='display:block!important;position:fixed;left:-30000px;top:0;width:198mm;background:#fff;z-index:-99999;pointer-events:none;';
+    summary.style.cssText='display:block;box-sizing:border-box;width:198mm;height:285mm;margin:0;padding:0;overflow:hidden;position:relative;background:#fff;';
+    detail.style.cssText='display:block;box-sizing:border-box;width:198mm;height:285mm;margin:0;padding:0;overflow:hidden;position:relative;background:#fff;';
+    summaryContent.style.maxHeight='260mm';
+    summaryContent.style.overflow='hidden';
+    detailScale.style.width='100%';
+    detailScale.style.maxHeight='none';
+    detailScale.style.overflow='visible';
+
+    // Deux frames laissent au navigateur le temps d'appliquer exactement la
+    // géométrie du print et le zoom calculé par fitDetailDensity().
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const imgs=[...host.querySelectorAll('img')].filter(img=>!img.hidden&&img.getAttribute('src'));
-    await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
 
-    const summary=pages[0],detail=pages[1];
-    if(summary.getBoundingClientRect().width<10||summary.getBoundingClientRect().height<10)throw new Error('La page récapitulative PDF n’a pas de dimensions.');
-    if(detail.getBoundingClientRect().width<10||detail.getBoundingClientRect().height<10)throw new Error('La page détail PDF n’a pas de dimensions.');
+    // Attendre les éventuelles images du logo avant la capture évite un PDF
+    // incomplet ou vide lorsque l'image n'était pas encore décodée.
+    const imgs=[...printArea.querySelectorAll('img')].filter(img=>!img.hidden&&img.getAttribute('src'));
+    await Promise.all(imgs.map(async img=>{
+      try{
+        if(img.decode)await img.decode();
+        else if(!img.complete)await new Promise(resolve=>{img.onload=resolve;img.onerror=resolve});
+      }catch(_){/* Le fallback texte reste utilisable si une image échoue. */}
+    }));
 
-    const captureOptions={scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,scrollX:0,scrollY:0};
+    const summaryRect=summary.getBoundingClientRect();
+    const detailRect=detail.getBoundingClientRect();
+    if(summaryRect.width<10||summaryRect.height<10)throw new Error('La page récapitulative PDF n’a pas de dimensions.');
+    if(detailRect.width<10||detailRect.height<10)throw new Error('La page détail PDF n’a pas de dimensions.');
+
+    const captureOptions={
+      scale:2,
+      backgroundColor:'#ffffff',
+      useCORS:true,
+      allowTaint:false,
+      logging:false,
+      scrollX:0,
+      scrollY:0
+    };
     const summaryCanvas=await html2canvas(summary,captureOptions);
     const detailCanvas=await html2canvas(detail,captureOptions);
     if(!summaryCanvas.width||!summaryCanvas.height||!detailCanvas.width||!detailCanvas.height)throw new Error('La capture PDF est vide.');
 
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-    pdf.addImage(summaryCanvas.toDataURL('image/jpeg',0.96),'JPEG',0,0,210,297,undefined,'FAST');
+
+    // Même marge de 6 mm que le @page du print : le contenu capturé 198 x 285 mm
+    // est positionné dans l'A4 sans changement de proportions.
+    pdf.addImage(summaryCanvas.toDataURL('image/jpeg',0.96),'JPEG',6,6,198,285,undefined,'FAST');
     pdf.addPage('a4','portrait');
-    pdf.addImage(detailCanvas.toDataURL('image/jpeg',0.96),'JPEG',0,0,210,297,undefined,'FAST');
+    pdf.addImage(detailCanvas.toDataURL('image/jpeg',0.96),'JPEG',6,6,198,285,undefined,'FAST');
     return pdf.output('blob');
   }finally{
-    host.remove();
+    restoreStyle(printArea,saved.area);
+    restoreStyle(summary,saved.summary);
+    restoreStyle(detail,saved.detail);
+    restoreStyle(summaryContent,saved.summaryContent);
+    restoreStyle(detailScale,saved.detailScale);
   }
 }
 async function downloadPdf(){try{const blob=await buildPdfBlob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=pdfFileName();a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);await markWeekEvent('PdfLeDT','PDF généré');toast('PDF créé.')}catch(err){toast(err.message+' Utilisez le bouton Imprimer pour enregistrer en PDF.')}}
@@ -1514,7 +1606,7 @@ function uniquePeopleForPrint(rows){
   });
 }
 function uniquePeople(rows){const m=new Map();rows.forEach(x=>{if(!m.has(x.PersonKey))m.set(x.PersonKey,x)});return[...m.values()]}
-function statusForPerson(p){if(p.Groupe==='Professionnel')return'Professionnel';if(p.Groupe==='Stagiaire / Visiteur')return guests.find(g=>g.PersonKey===p.PersonKey)?.TypePersonne||'Invité';return'Usager'}
+function statusForPerson(p){if(p.PrintProfessional||p.Groupe==='Professionnel'||p.SourceType==='Professionnel')return'Professionnel';if(p.Groupe==='Stagiaire / Visiteur')return guests.find(g=>g.PersonKey===p.PersonKey)?.TypePersonne||'Invité';return'Usager'}
 function statusClass(s){return norm(s).includes('rectific')?'rectificative':norm(s).includes('command')?'commandee':norm(s).includes('archiv')?'archivee':''}
 function norm(s){return String(s||'').trim().toLocaleLowerCase('fr-FR')}
 function dayIndex(k){return Math.max(0,DAYS.findIndex(d=>d.key===k))}
