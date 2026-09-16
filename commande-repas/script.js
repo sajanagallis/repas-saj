@@ -474,51 +474,139 @@ function pickFields(row,fields){const o={};Object.keys(fields).forEach(k=>o[k]=r
 function isProfessionalPrintRow(row){return !!row&&(row.Groupe==='Professionnel'||row.SourceType==='Professionnel'||String(row.PersonKey||'').startsWith('P:'))}
 function professionalMustPrintAtRdc(diet){const d=norm(canonicalDiet(diet));return d==='sans viande'||d==='sans porc'}
 function preparePrintCommands(c){
-  // Impression uniquement : les professionnels restent inchangés dans le widget Grist.
-  // Sur le print, ils sont anonymisés puis intégrés au RDC / 1er étage pour les repas sur place.
+  // Impression / PDF uniquement : les professionnels restent inchangés dans le widget Grist.
+  // Chaque professionnel est anonymisé puis affecté UNE SEULE FOIS à un étage pour toute
+  // la semaine. La même affectation est donc utilisée sur la page 1, la page 2 et le PDF.
   const out=(c||[]).map(x=>({...x}));
   const proRows=out.filter(isProfessionalPrintRow);
   if(!proRows.length)return out;
 
   const proPeople=uniquePeopleForPrint(proRows).sort(comparePeople);
   const labels=new Map(proPeople.map((p,i)=>[p.PersonKey,`PRO-${i+1}`]));
-  const profiles=new Map(proPeople.map(p=>[p.PersonKey,effectiveProfile(p.PersonKey,proRows.filter(r=>r.PersonKey===p.PersonKey))]));
+  const profiles=new Map(proPeople.map(p=>[
+    p.PersonKey,
+    effectiveProfile(p.PersonKey,proRows.filter(r=>r.PersonKey===p.PersonKey))
+  ]));
 
-  // Aucun nom de professionnel n'apparaît dans l'impression, y compris dans les blocs spéciaux.
-  proRows.forEach(r=>{r.PrintProfessional=true;r.Nom=labels.get(r.PersonKey)||'PRO';r.Prenom=''});
-
-  const weekTotals={RDC:0,'1er étage':0};
-  DAYS.forEach((day,dayPos)=>{
-    const dayRows=proRows.filter(r=>r.Jour===day.key&&r.TypeCommande==='Repas sur place');
-    const byPerson=new Map();
-    dayRows.forEach(r=>{if(!byPerson.has(r.PersonKey))byPerson.set(r.PersonKey,[]);byPerson.get(r.PersonKey).push(r)});
-    const people=[...byPerson.entries()].sort((a,b)=>(labels.get(a[0])||'').localeCompare(labels.get(b[0])||'','fr',{numeric:true}));
-    let rdcCount=0,floorCount=0;
-    const flexible=[];
-
-    people.forEach(([personKey,rows])=>{
-      const weight=rows.length;
-      const diet=profiles.get(personKey)?.Regime||'Normal';
-      if(professionalMustPrintAtRdc(diet)){
-        rows.forEach(r=>r.Groupe='RDC');
-        rdcCount+=weight;weekTotals.RDC+=weight;
-      }else flexible.push([personKey,rows]);
-    });
-
-    flexible.forEach(([personKey,rows],i)=>{
-      const weight=rows.length;
-      const diffIfRdc=Math.abs((rdcCount+weight)-floorCount);
-      const diffIfFloor=Math.abs(rdcCount-(floorCount+weight));
-      let target;
-      if(diffIfRdc<diffIfFloor)target='RDC';
-      else if(diffIfFloor<diffIfRdc)target='1er étage';
-      else if(weekTotals.RDC<weekTotals['1er étage'])target='RDC';
-      else if(weekTotals['1er étage']<weekTotals.RDC)target='1er étage';
-      else target=((dayPos+i)%2===0)?'RDC':'1er étage';
-      rows.forEach(r=>r.Groupe=target);
-      if(target==='RDC'){rdcCount+=weight;weekTotals.RDC+=weight}else{floorCount+=weight;weekTotals['1er étage']+=weight}
-    });
+  // Aucun vrai nom de professionnel n'apparaît dans le print ni dans le PDF,
+  // y compris dans les blocs Plateaux / Containers / Pique-niques.
+  proRows.forEach(r=>{
+    r.PrintProfessional=true;
+    r.Nom=labels.get(r.PersonKey)||'PRO';
+    r.Prenom='';
   });
+
+  // Présence repas sur place par professionnel et par jour : 0 ou 1.
+  // On ne compte jamais deux fois un même professionnel le même jour, même si une ancienne
+  // table contenait accidentellement des lignes en doublon.
+  const mealVector=new Map();
+  proPeople.forEach(p=>{
+    mealVector.set(p.PersonKey,DAYS.map(day=>
+      proRows.some(r=>r.PersonKey===p.PersonKey&&r.Jour===day.key&&r.TypeCommande==='Repas sur place')?1:0
+    ));
+  });
+
+  // Les professionnels Sans viande / Sans porc sont obligatoirement au RDC pour toute la semaine.
+  // Les autres sont répartis une seule fois pour obtenir l'équilibre quotidien le plus proche
+  // possible entre RDC et 1er étage sur leurs jours réels de repas sur place.
+  const fixedRdc=[];
+  const flexible=[];
+  proPeople.forEach(p=>{
+    const diet=profiles.get(p.PersonKey)?.Regime||'Normal';
+    (professionalMustPrintAtRdc(diet)?fixedRdc:flexible).push(p.PersonKey);
+  });
+
+  const fixedDaily=DAYS.map((_,i)=>fixedRdc.reduce((n,key)=>n+(mealVector.get(key)?.[i]||0),0));
+  const fixedWeekly=fixedDaily.reduce((a,b)=>a+b,0);
+
+  // Score d'une répartition : priorité à l'écart maximal d'un jour, puis à la somme des écarts,
+  // puis à l'équilibre du nombre total de repas PRO de la semaine, puis au nombre de PRO par étage.
+  // Le dernier critère rend les égalités totalement déterministes.
+  const evaluateAssignment=assignment=>{
+    const rdcDaily=[...fixedDaily];
+    const floorDaily=DAYS.map(()=>0);
+    let rdcPeople=fixedRdc.length;
+    let floorPeople=0;
+    let code='';
+
+    flexible.forEach((key,i)=>{
+      const target=assignment[i];
+      const v=mealVector.get(key)||DAYS.map(()=>0);
+      code+=target==='RDC'?'1':'0';
+      if(target==='RDC'){
+        rdcPeople++;
+        v.forEach((n,d)=>rdcDaily[d]+=n);
+      }else{
+        floorPeople++;
+        v.forEach((n,d)=>floorDaily[d]+=n);
+      }
+    });
+
+    const dailyDiff=rdcDaily.map((n,i)=>Math.abs(n-floorDaily[i]));
+    const maxDaily=Math.max(0,...dailyDiff);
+    const sumDaily=dailyDiff.reduce((a,b)=>a+b,0);
+    const rdcWeekly=rdcDaily.reduce((a,b)=>a+b,0);
+    const floorWeekly=floorDaily.reduce((a,b)=>a+b,0);
+    const weeklyDiff=Math.abs(rdcWeekly-floorWeekly);
+    const peopleDiff=Math.abs(rdcPeople-floorPeople);
+    return {score:[maxDaily,sumDaily,weeklyDiff,peopleDiff,code],rdcDaily,floorDaily};
+  };
+
+  const betterScore=(a,b)=>{
+    if(!b)return true;
+    for(let i=0;i<4;i++){
+      if(a[i]!==b[i])return a[i]<b[i];
+    }
+    // En cas d'égalité parfaite, on privilégie le code lexical le plus petit :
+    // cela affecte de façon stable les premiers PRO flexibles au 1er étage avant le RDC.
+    return a[4]<b[4];
+  };
+
+  let bestAssignment=[];
+  let best=null;
+
+  // Recherche exhaustive exacte pour un effectif professionnel réaliste.
+  // Au-delà de 20 professionnels flexibles, on utilise une construction gloutonne déterministe
+  // afin d'éviter de bloquer le navigateur, tout en conservant l'affectation hebdomadaire unique.
+  if(flexible.length<=20){
+    const current=new Array(flexible.length).fill('1er étage');
+    const search=i=>{
+      if(i===flexible.length){
+        const result=evaluateAssignment(current);
+        if(betterScore(result.score,best?.score)){
+          best=result;
+          bestAssignment=[...current];
+        }
+        return;
+      }
+      current[i]='1er étage';search(i+1);
+      current[i]='RDC';search(i+1);
+    };
+    search(0);
+  }else{
+    const current=[];
+    flexible.forEach((key,i)=>{
+      current[i]='1er étage';
+      const floorResult=evaluateAssignment(current.map((v,j)=>j<=i?v:'1er étage'));
+      current[i]='RDC';
+      const rdcResult=evaluateAssignment(current.map((v,j)=>j<=i?v:'1er étage'));
+      current[i]=betterScore(floorResult.score,rdcResult.score)?'1er étage':'RDC';
+    });
+    bestAssignment=current;
+    best=evaluateAssignment(bestAssignment);
+  }
+
+  const weeklyGroup=new Map();
+  fixedRdc.forEach(key=>weeklyGroup.set(key,'RDC'));
+  flexible.forEach((key,i)=>weeklyGroup.set(key,bestAssignment[i]||'1er étage'));
+
+  // IMPORTANT : on applique ensuite cet étage à TOUTES les lignes du professionnel,
+  // pas seulement au jour en cours. Ainsi un même PRO ne peut jamais apparaître à la fois
+  // au RDC et au 1er étage dans le détail de la semaine.
+  proRows.forEach(r=>{
+    r.Groupe=weeklyGroup.get(r.PersonKey)||'RDC';
+  });
+
   return out;
 }
 function renderPrint(){
