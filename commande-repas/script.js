@@ -14,6 +14,29 @@ const DIETS=['Normal','Sans viande','Sans porc','Hypocalorique','Hypolipidique']
 const TEXTURES=['Normale','Purée lisse','Haché lubrifié'];
 const TYPES=['Absent','Repas sur place','Plateau','Container','Pique-nique'];
 const GROUPS=['RDC','1er étage','Professionnel'];
+
+// Indicateur purement informatif : vacances scolaires de l'académie de Lyon (zone A).
+// Sources officielles : calendriers scolaires publiés au Journal officiel / Légifrance.
+// `resume` est le jour de reprise des cours ; la période affichée s'arrête la veille.
+const LYON_SCHOOL_HOLIDAYS=[
+  {name:'Toussaint',start:'2025-10-18',resume:'2025-11-03'},
+  {name:'Noël',start:'2025-12-20',resume:'2026-01-05'},
+  {name:'Hiver',start:'2026-02-07',resume:'2026-02-23'},
+  {name:'Printemps',start:'2026-04-04',resume:'2026-04-20'},
+  {name:'Été',start:'2026-07-04',resume:'2026-09-01'},
+  {name:'Toussaint',start:'2026-10-17',resume:'2026-11-02'},
+  {name:'Noël',start:'2026-12-19',resume:'2027-01-04'},
+  {name:'Hiver',start:'2027-02-13',resume:'2027-03-01'},
+  {name:'Printemps',start:'2027-04-10',resume:'2027-04-26'},
+  {name:'Été',start:'2027-07-03',resume:'2027-09-02'},
+  {name:'Toussaint',start:'2027-10-23',resume:'2027-11-08'},
+  {name:'Noël',start:'2027-12-18',resume:'2028-01-03'},
+  {name:'Hiver',start:'2028-02-19',resume:'2028-03-06'},
+  {name:'Printemps',start:'2028-04-22',resume:'2028-05-09'},
+  // Le calendrier 2027-2028 fixe le début des vacances d'été au 4 juillet 2028.
+  // La rentrée 2028-2029 n'étant pas nécessaire à l'indicateur de début, on borne l'affichage à fin août.
+  {name:'Été',start:'2028-07-04',resume:null,through:'2028-08-31'}
+];
 const DEFAULT_TEMPLATE=`Bonjour,\n\nVeuillez trouver ci-joint la commande repas du SAJ Anagallis pour la {{SEMAINE}}.\n\nJe vous remercie et vous souhaite une bonne journée.\n\nCordialement,\n\nSAJ Anagallis`;
 const TABLES={config:'Repas_Config',template:'Repas_Modele',weeks:'Repas_Semaines',cmd:'Repas_Commandes',guests:'Repas_Invites',closures:'Repas_Fermetures',settings:'Repas_Parametres',audit:'Repas_Journal'};
 const REQUIRED_DOM_IDS=['editor','weekPicker','weekYear','weekList','weekTitle','weekStatus','weekComment','saveWeekBtn','saveTemplateBtn','printBtn','pdfBtn','emailBtn','templateSettings','historyList','historyYear','peopleSettings','closureList','printArea','printSummaryPage','printDetailPage','summaryContent','detailContent','detailScale','toast'];
@@ -374,11 +397,48 @@ function renderWeekNavigation(){
 function renderCommande(){
   const wk=currentWeek();const label=weekLabel(weekStart);$('weekTitle').textContent=label;$('weekStatus').value=effectiveWeekStatus(wk);$('weekComment').value=wk?.Commentaire||'';
   $('printWeek1').textContent=label;$('printWeek2').textContent=label;
-  renderClosureBanners();renderEditor();renderAudit();renderPrint();fitDetailDensity();
+  renderSchoolHolidayBanner();renderClosureBanners();renderEditor();renderAudit();renderPrint();fitDetailDensity();
   const archived=isWeekArchived(wk);
   $('unlockArchive').hidden=!archived||archiveEditUnlocked;
   $('editor').classList.toggle('locked',archived&&!archiveEditUnlocked);
 }
+function ensureSchoolHolidayBanner(){
+  let el=document.getElementById('schoolHolidayBanner');
+  if(el)return el;
+  const anchor=$('closureBanner');
+  if(!anchor||!anchor.parentElement)return null;
+  el=document.createElement('div');
+  el.id='schoolHolidayBanner';
+  el.hidden=true;
+  el.setAttribute('role','status');
+  el.setAttribute('aria-live','polite');
+  el.style.cssText='margin-top:7px;padding:7px 10px;border:1px solid #e4c464;border-radius:8px;background:#fff7d6;color:#5f4a00;font-size:13px;font-weight:700;line-height:1.3;';
+  anchor.parentElement.insertBefore(el,anchor);
+  return el;
+}
+function schoolHolidayForWeek(monday){
+  const weekStartDate=new Date(monday);weekStartDate.setHours(12,0,0,0);
+  const weekEndDate=addDays(weekStartDate,4);
+  return LYON_SCHOOL_HOLIDAYS.find(v=>{
+    const start=parseKey(v.start);
+    const end=v.resume?addDays(parseKey(v.resume),-1):parseKey(v.through);
+    return isValidDate(start)&&isValidDate(end)&&weekEndDate>=start&&weekStartDate<=end;
+  })||null;
+}
+function renderSchoolHolidayBanner(){
+  const el=ensureSchoolHolidayBanner();if(!el)return;
+  const vac=schoolHolidayForWeek(weekStart);
+  if(!vac){el.hidden=true;el.textContent='';return}
+  const start=parseKey(vac.start);
+  if(vac.resume){
+    const resume=parseKey(vac.resume);
+    el.textContent=`Vacances scolaires – Académie de Lyon : ${vac.name} · départ ${frDate(start)} · reprise ${frDate(resume)}`;
+  }else{
+    el.textContent=`Vacances scolaires – Académie de Lyon : ${vac.name} · à partir du ${frDate(start)}`;
+  }
+  el.hidden=false;
+}
+
 function renderClosureBanners(){
   const info=weekClosureInfo(weekStart);const els=[$('closureBanner'),$('summaryClosure'),$('detailClosure')];
   if(!info.days.length){els.forEach(e=>e.hidden=true);return}
@@ -424,7 +484,7 @@ function renderEditor(){
   document.querySelectorAll('[data-add-permanent-group]').forEach(x=>x.onclick=()=>openAddForGroup(x.dataset.addPermanentGroup));
   document.querySelectorAll('[data-edit-permanent]').forEach(x=>x.onclick=()=>editPersonByKey(x.dataset.editPermanent));
   document.querySelectorAll('[data-remove-permanent]').forEach(x=>x.onclick=()=>removePermanentPerson(x.dataset.removePermanent));
-  $('addGuest').onclick=()=>$('guestDialog').showModal();
+  $('addGuest').onclick=openGuestDialog;
 }
 function editorGroup(group,c){
   // V34 : la liste des personnes vient de Repas_Config, qui est la source de vérité
@@ -454,10 +514,10 @@ function editorTable(people,c,isGuest=false,sortField='name',managePermanent=fal
   const professionalOnly=!isGuest && people.length>0 && people.every(p=>p.Groupe==='Professionnel');
   return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th>${professionalOnly?'':'<th>Texture</th>'}${DAYS.map(d=>`<th>${d.label}</th>`).join('')}${(isGuest||managePermanent)?'<th>Gestion</th>':''}</tr></thead><tbody>${sortPeopleSimple(people,sortField).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const cfg=config.find(x=>x.PersonKey===p.PersonKey);return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',isGuest)}</td>${professionalOnly?'':`<td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',isGuest)}</td>`}${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:managePermanent&&cfg?`<td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
 function editorDayCell(c){if(!c)return'<td>—</td>';const closed=c.TypeCommande==='Fermé';const mealClass='meal-'+norm(c.TypeCommande).replace(/[^a-z0-9]+/g,'-');return `<td class="day-cell ${closed?'closed-cell':''} ${mealClass}">${closed?'<b>FERMÉ</b>':`<div class="order-line"><select class="order-select" data-order-id="${c.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${c.TypeCommande===t?'selected':''}>${t}</option>`).join('')}</select><button class="mini propagate" type="button" title="Appliquer aux semaines suivantes" data-propagate-id="${c.id}">↪</button></div>${extrasHtml(c)}`}</td>`}
-function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" title="Heure de retrait" data-time-id="${c.id}" value="${esc(c.HeureRetrait||'')}">`;if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
+function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" step="900" title="Heure de retrait (00, 15, 30 ou 45 minutes)" data-time-id="${c.id}" value="${esc(normalizeQuarterHour(c.HeureRetrait||''))}">`;if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
 
 async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const type=e.target.value;const old=commands.find(x=>x.id===id);if(!old)return;await updateCmd(id,{TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(old.HeureRetrait||''):'',Pain:type==='Pique-nique'?(old.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(old.OptionPique||''):''},`Type de repas : ${old.TypeCommande} → ${type}`)}
-async function onExtraChange(e){const id=+(e.target.dataset.timeId||e.target.dataset.breadId||e.target.dataset.picnicId);const field=e.target.dataset.timeId?'HeureRetrait':e.target.dataset.breadId?'Pain':'OptionPique';const old=commands.find(x=>x.id===id);await updateCmd(id,{[field]:e.target.value},`${field} : ${old?.[field]||'—'} → ${e.target.value||'—'}`)}
+async function onExtraChange(e){const id=+(e.target.dataset.timeId||e.target.dataset.breadId||e.target.dataset.picnicId);const field=e.target.dataset.timeId?'HeureRetrait':e.target.dataset.breadId?'Pain':'OptionPique';const old=commands.find(x=>x.id===id);const value=field==='HeureRetrait'?normalizeQuarterHour(e.target.value):e.target.value;if(field==='HeureRetrait')e.target.value=value;await updateCmd(id,{[field]:value},`${field} : ${old?.[field]||'—'} → ${value||'—'}`)}
 async function updateCmd(id,fields,detail='Modification de repas'){
   const old=commands.find(x=>+x.id===+id);if(!old)return;
   // Sécurité d'enregistrement : si une ancienne version a créé des doublons pour la même
@@ -1359,8 +1419,8 @@ function bindUI(){
   $('checkOrder').onclick=showValidation;$('absenceBtn').onclick=openAbsenceDialog;$('absenceForm').addEventListener('submit',applyAbsenceRange);$('propagateForm').addEventListener('submit',applyPropagation);$('unlockArchive').onclick=unlockArchivedWeek;
   $('printBtn').onclick=handlePrintClick;$('pdfBtn').onclick=handlePdfClick;$('emailBtn').onclick=openEmailDialog;
   $('logoFile').onchange=onLogoFileChange;$('removeLogo').onclick=removeLogo;
-  $('addPerson').onclick=()=>openPersonDialog();$('personSource').onchange=onPersonSourceChange;$('sourcePerson').onchange=applySourceSelection;$('personForm').addEventListener('submit',savePersonFromDialog);
-  $('guestForm').addEventListener('submit',saveGuestFromDialog);
+  $('addPerson').onclick=()=>openPersonDialog();configurePersonDialogUI();$('personForm').addEventListener('submit',savePersonFromDialog);
+  $('guestForm').addEventListener('submit',saveGuestFromDialog);configureGuestDialogCancel();
   $('closureForm').addEventListener('submit',saveClosure);
   $('saveEmailSettings').onclick=saveEmailSettings;
   $('emailForm').addEventListener('submit',createOutlookDraft);
@@ -1414,7 +1474,7 @@ async function flushVisibleOrderSelections(){
     const type=sel.value;const td=sel.closest('td');
     const fields={
       TypeCommande:type,
-      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(td?.querySelector('[data-time-id]')?.value||row.HeureRetrait||''):'',
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?normalizeQuarterHour(td?.querySelector('[data-time-id]')?.value||row.HeureRetrait||''):'',
       Pain:type==='Pique-nique'?(td?.querySelector('[data-bread-id]')?.value||row.Pain||'Pain'):'',
       OptionPique:type==='Pique-nique'?(td?.querySelector('[data-picnic-id]')?.value||row.OptionPique||''):''
     };
@@ -1488,30 +1548,83 @@ function showSavedState(message='Modifications enregistrées'){
 async function resetWeekFromTemplate(){if(!confirm('Réinitialiser cette semaine depuis la semaine modèle ? Les modifications de cette semaine seront remplacées.'))return;const key=weekKey(weekStart);const old=currentCommands();const actions=old.map(x=>['RemoveRecord',TABLES.cmd,x.id]);if(actions.length)await grist.docApi.applyUserActions(actions);await createWeekRows(key);await recreateGuestCommands();await logAudit({action:'Réinitialisation',detail:'Semaine réinitialisée depuis la semaine modèle'});await touchWeek(true);await loadAll();renderAll();toast('Semaine réinitialisée depuis la semaine modèle.')}
 async function recreateGuestCommands(){const key=weekKey(weekStart);const actions=[];currentGuests().forEach(g=>DAYS.forEach(d=>{const date=addDays(weekStart,d.offset);const closed=closureFor(date);actions.push(['AddRecord',TABLES.cmd,null,{SemaineKey:key,PersonKey:g.PersonKey,SourceType:g.TypePersonne,SourceId:g.id,Nom:g.Nom,Prenom:g.Prenom,Groupe:'Stagiaire / Visiteur',Regime:g.Regime,Texture:g.Texture,Jour:d.key,DateJour:gristDate(addDays(weekStart,d.offset)),Annee:weekStart.getFullYear(),TypeCommande:closed?'Fermé':(g[d.key]?'Repas sur place':'Absent'),HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:''}])}));if(actions.length)await grist.docApi.applyUserActions(actions)}
 
-function openPersonDialog(p=null){$('personDialogTitle').textContent=p?'Modifier la personne':'Ajouter une personne';$('personConfigId').value=p?.id||'';$('personSource').value=p?(p.SourceType==='Usager'?'user':p.SourceType==='Professionnel'?'pro':'manual'):'manual';onPersonSourceChange();$('personFirst').value=p?.Prenom||'';$('personLast').value=p?.Nom||'';$('personGroup').value=p?.Groupe||'RDC';$('personDiet').value=p?.Regime||'Normal';$('personTexture').value=p?.Texture||'Normale';DAYS.forEach(d=>{const el=document.querySelector(`[data-pday="${d.key}"]`);el.checked=!!p?.[d.key]});$('personStart').value=p?.DateDebut||'';$('personEnd').value=p?.DateFin||'';$('personActive').checked=p? p.Actif!==false:true;$('personDialog').showModal()}
-function onPersonSourceChange(){const src=$('personSource').value;const wrap=$('sourceSelectWrap');wrap.hidden=src==='manual';const rows=src==='user'?sourceUsers:sourcePros;$('sourcePerson').innerHTML=rows.map(r=>`<option value="${r.id}">${esc(r.Nom||'')} ${esc(r.Prenom||'')}</option>`).join('');$('personFirst').disabled=src!=='manual';$('personLast').disabled=src!=='manual';if(src!=='manual')applySourceSelection()}
-function applySourceSelection(){const src=$('personSource').value;const rows=src==='user'?sourceUsers:sourcePros;const r=rows.find(x=>+x.id===+$('sourcePerson').value);if(r){$('personFirst').value=r.Prenom||'';$('personLast').value=r.Nom||'';if(src==='pro')$('personGroup').value='Professionnel'}}
+function configurePersonDialogUI(){
+  // Création directe uniquement : ne plus proposer de personnes « existantes ».
+  const source=$('personSource');if(source){source.value='manual';const label=source.closest('label');if(label)label.hidden=true}
+  const sourceWrap=$('sourceSelectWrap');if(sourceWrap)sourceWrap.hidden=true;
+  // Les dates Début / Fin ne concernent pas un usager ou un professionnel permanent.
+  const start=$('personStart'),end=$('personEnd');
+  const dateWrap=start?.closest('.two')||end?.closest('.two');if(dateWrap)dateWrap.hidden=true;
+  if(start)start.tabIndex=-1;if(end)end.tabIndex=-1;
+}
+function openPersonDialog(p=null,forcedGroup=''){
+  configurePersonDialogUI();
+  const group=forcedGroup||p?.Groupe||'RDC';
+  const isPro=group==='Professionnel';
+  $('personDialogTitle').textContent=p?(isPro?'Modifier le professionnel':'Modifier l’usager'):(isPro?'Ajouter un professionnel':'Ajouter un usager');
+  $('personConfigId').value=p?.id||'';
+  $('personSource').value='manual';
+  $('personFirst').disabled=false;$('personLast').disabled=false;
+  $('personFirst').value=p?.Prenom||'';$('personLast').value=p?.Nom||'';
+  $('personGroup').value=group;
+  $('personDiet').value=p?.Regime||'Normal';$('personTexture').value=p?.Texture||'Normale';
+  DAYS.forEach(d=>{const el=document.querySelector(`[data-pday="${d.key}"]`);if(el)el.checked=p?!!p[d.key]:false});
+  // Champs techniques conservés en arrière-plan mais jamais demandés à l'utilisateur.
+  $('personStart').value=p?.DateDebut||'';$('personEnd').value=p?.DateFin||'';
+  $('personActive').checked=p?p.Actif!==false:true;
+  $('personDialog').showModal();
+}
+function onPersonSourceChange(){configurePersonDialogUI()}
+function applySourceSelection(){}
 function editPerson(id){openPersonDialog(config.find(x=>+x.id===id))}
 function editPersonByKey(personKey){const p=config.find(x=>x.PersonKey===personKey);if(p)openPersonDialog(p)}
-function openAddForGroup(group){
-  openPersonDialog();
-  const isPro=group==='Professionnel';
-  $('personSource').value=isPro?'pro':'user';
-  onPersonSourceChange();
-  $('personGroup').value=group;
-  if(isPro)$('personGroup').value='Professionnel';
-}
+function openAddForGroup(group){openPersonDialog(null,group)}
 async function removePermanentPerson(personKey){
   const p=config.find(x=>x.PersonKey===personKey);if(!p)return;
   const label=`${p.Nom||''} ${p.Prenom||''}`.trim();
-  if(!confirm(`Retirer ${label} des nouvelles commandes ?\\n\\nLa personne sera désactivée, mais restera dans les anciennes commandes et l'historique.`))return;
+  if(!confirm(`Retirer ${label} des nouvelles commandes ?\n\nLa personne sera désactivée, mais restera dans les anciennes commandes et l'historique.`))return;
   const fields={Actif:false,DateFin:weekKey(new Date()),DateFinDate:gristDate(new Date())};
   await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,p.id,fields]]);
   await loadAll();await syncConfigToFutureWeeks(p.PersonKey);await loadAll();renderAll();toast(`${label} a été retiré(e) des nouvelles commandes.`);
 }
-async function savePersonFromDialog(e){e.preventDefault();let id=+$('personConfigId').value;const src=$('personSource').value;const sourceId=src==='manual'?0:+$('sourcePerson').value;const st=src==='user'?'Usager':src==='pro'?'Professionnel':'Manuel';let existing=id?config.find(x=>+x.id===id):null;let key=existing?.PersonKey;if(!key)key=st==='Usager'?'U:'+sourceId:st==='Professionnel'?'P:'+sourceId:'M:'+Date.now();if(!id&&st!=='Manuel'){const same=config.find(x=>x.PersonKey===key);if(same){id=same.id;existing=same;}}const rec={PersonKey:key,SourceType:st,SourceId:sourceId,Nom:$('personLast').value.trim(),Prenom:$('personFirst').value.trim(),Groupe:$('personGroup').value,Regime:$('personDiet').value,Texture:$('personTexture').value,DateDebut:$('personStart').value,DateFin:$('personEnd').value,DateDebutDate:$('personStart').value?gristDate(parseKey($('personStart').value)):null,DateFinDate:$('personEnd').value?gristDate(parseKey($('personEnd').value)):null,Actif:$('personActive').checked};DAYS.forEach(d=>rec[d.key]=document.querySelector(`[data-pday="${d.key}"]`).checked);if(id)await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,id,rec]]);else await grist.docApi.applyUserActions([['AddRecord',TABLES.config,null,rec]]);$('personDialog').close();await loadAll();await syncTemplatePersonFromConfig(key);await loadAll();await syncConfigToFutureWeeks(key,{updateProfile:true});await loadAll();renderAll();toast('Personne enregistrée.')}
+async function savePersonFromDialog(e){
+  e.preventDefault();
+  let id=+$('personConfigId').value;
+  const existing=id?config.find(x=>+x.id===id):null;
+  const group=$('personGroup').value;
+  const st=group==='Professionnel'?'Professionnel':'Usager';
+  const sourceId=existing?.SourceId||0;
+  let key=existing?.PersonKey;
+  if(!key)key=`${st==='Professionnel'?'P':'U'}:N:${Date.now()}`;
+  const startText=existing?.DateDebut||'',endText=existing?.DateFin||'';
+  const rec={
+    PersonKey:key,SourceType:st,SourceId:sourceId,
+    Nom:$('personLast').value.trim(),Prenom:$('personFirst').value.trim(),
+    Groupe:group,Regime:$('personDiet').value,Texture:$('personTexture').value,
+    DateDebut:startText,DateFin:endText,
+    DateDebutDate:existing?.DateDebutDate||null,DateFinDate:existing?.DateFinDate||null,
+    Actif:$('personActive').checked
+  };
+  if(!rec.Nom&&!rec.Prenom){toast('Indiquez au moins le nom ou le prénom.');return}
+  DAYS.forEach(d=>rec[d.key]=!!document.querySelector(`[data-pday="${d.key}"]`)?.checked);
+  if(id)await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,id,rec]]);
+  else await grist.docApi.applyUserActions([['AddRecord',TABLES.config,null,rec]]);
+  $('personDialog').close();
+  await loadAll();await syncTemplatePersonFromConfig(key);await loadAll();await syncConfigToFutureWeeks(key,{updateProfile:true});await loadAll();renderAll();
+  toast(st==='Professionnel'?'Professionnel enregistré.':'Usager enregistré.');
+}
 async function togglePerson(id){const p=config.find(x=>+x.id===id);if(!p)return;const active=p.Actif===false;const fields={Actif:active};if(active){fields.DateFin='';fields.DateFinDate=null}else if(!p.DateFin){fields.DateFin=weekKey(new Date());fields.DateFinDate=gristDate(new Date())}await grist.docApi.applyUserActions([['UpdateRecord',TABLES.config,id,fields]]);await loadAll();await syncConfigToFutureWeeks(p.PersonKey);await loadAll();renderAll()}
 async function syncConfigToFutureWeeks(personKey,{updateProfile=false,excludeWeek=''}={}){const p=config.find(x=>x.PersonKey===personKey);if(!p)return;const today=mondayOf(new Date());const actions=[];weeks.filter(w=>parseKey(w.SemaineKey)>=today&&w.Statut==='À préparer'&&w.SemaineKey!==excludeWeek).forEach(w=>{const monday=parseKey(w.SemaineKey);const exists=commands.filter(c=>c.SemaineKey===w.SemaineKey&&c.PersonKey===personKey);const start=configDate(p,'start'),end=configDate(p,'end');const active=p.Actif!==false&&(!start||start<=addDays(monday,4))&&(!end||end>=monday);if(active&&!exists.length){DAYS.forEach(d=>{const closed=closureFor(addDays(monday,d.offset));{const rec=templateCommandRecord(p,w.SemaineKey,d.key);if(closed){rec.TypeCommande='Fermé';rec.HeureRetrait='';rec.Pain='';rec.OptionPique=''}actions.push(['AddRecord',TABLES.cmd,null,rec])}})}else if(active&&exists.length&&updateProfile){exists.forEach(x=>actions.push(['UpdateRecord',TABLES.cmd,x.id,{Groupe:p.Groupe,Regime:p.Regime,Texture:p.Texture}]))}else if(!active&&exists.length){exists.forEach(x=>actions.push(['RemoveRecord',TABLES.cmd,x.id]))}});if(actions.length)await grist.docApi.applyUserActions(actions)}
+
+function configureGuestDialogCancel(){
+  const dialog=$('guestDialog'),form=$('guestForm');if(!dialog||!form)return;
+  const cancel=form.querySelector('button[value="cancel"]');if(!cancel)return;
+  cancel.type='button';
+  cancel.onclick=()=>{dialog.close();form.reset();fillStaticSelects()};
+}
+function openGuestDialog(){
+  const form=$('guestForm');if(form)form.reset();fillStaticSelects();configureGuestDialogCancel();$('guestDialog').showModal();
+}
 
 async function saveGuestFromDialog(e){e.preventDefault();const key=weekKey(weekStart);const pkey='G:'+Date.now();const rec={SemaineKey:key,PersonKey:pkey,Nom:$('guestLast').value.trim(),Prenom:$('guestFirst').value.trim(),TypePersonne:$('guestType').value,Etage:$('guestFloor').value,Regime:$('guestDiet').value,Texture:$('guestTexture').value,Annee:weekStart.getFullYear(),Actif:true};DAYS.forEach(d=>rec[d.key]=document.querySelector(`[data-gday="${d.key}"]`).checked);await grist.docApi.applyUserActions([['AddRecord',TABLES.guests,null,rec]]);await loadAll();const g=guests.find(x=>x.PersonKey===pkey);const actions=[];DAYS.forEach(d=>{const closed=closureFor(addDays(weekStart,d.offset));actions.push(['AddRecord',TABLES.cmd,null,{SemaineKey:key,PersonKey:pkey,SourceType:g.TypePersonne,SourceId:g.id,Nom:g.Nom,Prenom:g.Prenom,Groupe:'Stagiaire / Visiteur',Regime:g.Regime,Texture:g.Texture,Jour:d.key,DateJour:gristDate(addDays(weekStart,d.offset)),Annee:weekStart.getFullYear(),TypeCommande:closed?'Fermé':(g[d.key]?'Repas sur place':'Absent'),HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:''}])});await grist.docApi.applyUserActions(actions);await logAudit({action:'Ajout invité',week:key,detail:`Ajout de ${g.TypePersonne.toLowerCase()} : ${g.Nom} ${g.Prenom}`});await touchWeek(true);$('guestDialog').close();e.target.reset();fillStaticSelects();await loadAll();renderAll()}
 async function removeGuest(e){const id=+e.target.dataset.removeGuest;const g=guests.find(x=>+x.id===id);if(!g)return;if(!confirm('Retirer cette personne de la semaine ?'))return;const a=[['UpdateRecord',TABLES.guests,id,{Actif:false}],...commands.filter(c=>c.SemaineKey===g.SemaineKey&&c.PersonKey===g.PersonKey).map(c=>['RemoveRecord',TABLES.cmd,c.id])];await grist.docApi.applyUserActions(a);await logAudit({action:'Retrait invité',week:g.SemaineKey,detail:`Retrait de ${g.Nom} ${g.Prenom}`});await touchWeek(true);await loadAll();renderAll()}
@@ -1652,6 +1765,12 @@ function validateCurrentWeek(){
 }
 function showValidation(){const result=validateCurrentWeek();const now=new Date();const w=currentWeek();if(w)grist.docApi.applyUserActions([['UpdateRecord',TABLES.weeks,w.id,{ControleLeDT:gristDateTime(now),ControleOK:result.errors.length===0}]]).then(()=>loadAll());$('validationContent').innerHTML=result.errors.length?`<p><b>${result.errors.length} anomalie(s) détectée(s)</b></p><ul class="validation-errors">${result.errors.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:`<div class="validation-ok">Aucune anomalie détectée. La commande est cohérente.</div>`;$('validationDialog').showModal();}
 function dayName(k){return DAYS.find(d=>d.key===k)?.label||k}
+function normalizeQuarterHour(value){
+  const m=String(value||'').match(/^(\d{1,2}):(\d{2})/);if(!m)return'';
+  let h=Math.max(0,Math.min(23,+m[1]||0)),min=Math.max(0,Math.min(59,+m[2]||0));
+  let q=Math.round(min/15)*15;if(q===60){h=(h+1)%24;q=0}
+  return `${String(h).padStart(2,'0')}:${String(q).padStart(2,'0')}`;
+}
 
 function renderAudit(){if(!$('auditList'))return;const rows=audit.filter(x=>x.SemaineKey===weekKey(weekStart)).sort((a,b)=>(b.DateHeure||0)-(a.DateHeure||0)).slice(0,80);$('auditList').innerHTML=rows.length?rows.map(x=>`<div class="audit-row"><span>${formatDateTime(x.DateHeure)}</span><span>${esc(x.Auteur||'Utilisateur')}</span><span>${esc(x.Action||'')}</span><span class="audit-detail">${esc(x.Detail||x.NouvelleValeur||'')}</span></div>`).join(''):'<div class="audit-empty">Aucune modification enregistrée pour cette semaine.</div>'}
 async function logAudit({week=weekKey(weekStart),action='Modification',row=null,oldValue='',newValue='',detail=''}){try{await grist.docApi.applyUserActions([['AddRecord',TABLES.audit,null,{SemaineKey:week,DateHeure:gristDateTime(new Date()),Auteur:getSetting('auditUser','')||'Utilisateur du widget',Action:action,PersonKey:row?.PersonKey||'',NomPrenom:row?`${row.Nom||''} ${row.Prenom||''}`.trim():'',Jour:row?.Jour||'',AncienneValeur:String(oldValue??''),NouvelleValeur:String(newValue??''),Detail:detail||''}]])}catch(e){console.warn('Journal non disponible',e)}}
