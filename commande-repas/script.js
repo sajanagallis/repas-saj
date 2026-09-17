@@ -570,7 +570,12 @@ function extrasHtml(c){
   const [hour='--',minute='--']=normalized?normalized.split(':'):['--','--'];
   const hourOptions=['--',...Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))].map(v=>`<option value="${v==='--'?'':v}" ${hour===v?'selected':''}>${v}</option>`).join('');
   const minuteOptions=['--','00','15','30','45'].map(v=>`<option value="${v==='--'?'':v}" ${minute===v?'selected':''}>${v}</option>`).join('');
-  let s=`<div class="extra-row"><select aria-label="Heure de retrait" title="Heure" data-time-hour-id="${c.id}">${hourOptions}</select><span class="time-separator">:</span><select aria-label="Minutes de retrait" title="Minutes : 00, 15, 30 ou 45" data-time-minute-id="${c.id}">${minuteOptions}</select>`;
+
+  // V44 - horaires compacts : on neutralise ici le width:100% global des <select>.
+  // Les deux champs restent volontairement petits : HH : MM.
+  const compactTimeStyle='width:58px!important;min-width:58px!important;max-width:58px!important;flex:0 0 58px!important;box-sizing:border-box!important;padding:3px 18px 3px 5px!important;margin:0!important;';
+
+  let s=`<div class="extra-row"><select class="time-part-select" style="${compactTimeStyle}" aria-label="Heure de retrait" title="Heure" data-time-hour-id="${c.id}">${hourOptions}</select><span class="time-separator">:</span><select class="time-part-select" style="${compactTimeStyle}" aria-label="Minutes de retrait" title="Minutes : 00, 15, 30 ou 45" data-time-minute-id="${c.id}">${minuteOptions}</select>`;
   if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;
   return s+'</div>';
 }
@@ -579,14 +584,30 @@ async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const typ
 async function onExtraChange(e){
   const id=+(e.target.dataset.timeHourId||e.target.dataset.timeMinuteId||e.target.dataset.breadId||e.target.dataset.picnicId);
   const old=commands.find(x=>+x.id===id);if(!old)return;
+
   if(e.target.dataset.timeHourId!==undefined||e.target.dataset.timeMinuteId!==undefined){
     const row=e.target.closest('.extra-row');
     const h=row?.querySelector('[data-time-hour-id]')?.value||'';
     const m=row?.querySelector('[data-time-minute-id]')?.value||'';
-    const value=(h&&m)?`${h}:${m}`:'';
-    await updateCmd(id,{HeureRetrait:value},`HeureRetrait : ${old.HeureRetrait||'—'} → ${value||'—'}`);
+
+    // IMPORTANT : tant que l'heure ET les minutes ne sont pas choisies,
+    // on ne recharge pas la cellule. Cela permet de choisir les deux menus
+    // successivement sans perdre la première sélection.
+    if(!h||!m){
+      // Si une heure était déjà enregistrée et que l'utilisateur remet une
+      // des deux parties sur "--", il s'agit bien d'un effacement volontaire.
+      if(old.HeureRetrait){
+        await updateCmd(id,{HeureRetrait:''},`HeureRetrait : ${old.HeureRetrait||'—'} → —`);
+      }
+      return;
+    }
+
+    const value=`${h}:${m}`;
+    if(value===normalizeQuarterHour(old.HeureRetrait||''))return;
+    await updateCmd(id,{HeureRetrait:value},`HeureRetrait : ${old.HeureRetrait||'—'} → ${value}`);
     return;
   }
+
   const field=e.target.dataset.breadId!==undefined?'Pain':'OptionPique';
   const value=e.target.value;
   await updateCmd(id,{[field]:value},`${field} : ${old?.[field]||'—'} → ${value||'—'}`);
