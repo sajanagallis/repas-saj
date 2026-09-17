@@ -93,7 +93,7 @@ const REQUIRED_SCHEMA={
 };
 
 
-let weekStart=mondayOf(new Date());
+let weekStart=addDays(mondayOf(new Date()),7);
 let sourceUsers=[],sourcePros=[],config=[],templateRows=[],weeks=[],commands=[],guests=[],closures=[],settings=[],audit=[];
 let repartitions=[],rooms=[];
 let saveTimer=null;
@@ -140,8 +140,7 @@ async function init(){
     await reconcileLegacyWeekStatuses();
     await archivePastWeeks();
     await loadAll();
-    const currentKey=weekKey(weekStart);
-    if(!weeks.some(w=>w.SemaineKey===currentKey))weekStart=mondayOf(new Date());
+    weekStart=addDays(mondayOf(new Date()),7);
     renderAll();
   }catch(err){
     console.error(err);
@@ -480,7 +479,11 @@ function renderSchoolHolidayBanner(){
     lines.push(`${vacationLabels[vac.name]||('Vacances de '+vac.name)} du ${dm(start)} au ${dm(end)}`);
   }
   if(holidays.length){
-    lines.push(holidays.map(h=>h.name).join(' · '));
+    const monthNames=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    lines.push(holidays.map(h=>{
+      const name=h.name==='Armistice 1918'?'Armistice':h.name;
+      return `${name} - ${h.date.getDate()} ${monthNames[h.date.getMonth()]}`;
+    }).join(' · '));
   }
   el.innerHTML=lines.map(esc).join('<br>');
   el.hidden=false;
