@@ -6,7 +6,7 @@
 */
 'use strict';
 
-const APP_VERSION='V40';
+const APP_VERSION='V44';
 const DAYS=[
   {key:'Lu',short:'Lun',label:'Lundi',offset:0},{key:'Ma',short:'Mar',label:'Mardi',offset:1},{key:'Me',short:'Mer',label:'Mercredi',offset:2},{key:'Je',short:'Jeu',label:'Jeudi',offset:3},{key:'Ve',short:'Ven',label:'Vendredi',offset:4}
 ];
@@ -15,7 +15,7 @@ const TEXTURES=['Normale','Purée lisse','Haché lubrifié'];
 const TYPES=['Absent','Repas sur place','Plateau','Container','Pique-nique'];
 const GROUPS=['RDC','1er étage','Professionnel'];
 
-// Indicateur purement informatif : vacances scolaires de l'académie de Lyon (zone A).
+// Indicateur purement informatif : vacances scolaires de Lyon (zone A), affichage concis.
 // Sources officielles : calendriers scolaires publiés au Journal officiel / Légifrance.
 // `resume` est le jour de reprise des cours ; la période affichée s'arrête la veille.
 const LYON_SCHOOL_HOLIDAYS=[
@@ -36,7 +36,48 @@ const LYON_SCHOOL_HOLIDAYS=[
   // Le calendrier 2027-2028 fixe le début des vacances d'été au 4 juillet 2028.
   // La rentrée 2028-2029 n'étant pas nécessaire à l'indicateur de début, on borne l'affichage à fin août.
   {name:'Été',start:'2028-07-04',resume:null,through:'2028-08-31'}
+
 ];
+
+// Jours fériés légaux en France métropolitaine (Rhône compris).
+// Indicateur uniquement informatif : aucun repas, aucune présence et aucune fermeture ne sont modifiés.
+function easterSunday(year){
+  // Algorithme de Meeus/Jones/Butcher (calendrier grégorien).
+  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
+  const l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31);
+  const day=((h+l-7*m+114)%31)+1;
+  return new Date(year,month-1,day,12,0,0,0);
+}
+function publicHolidaysForYear(year){
+  const easter=easterSunday(year);
+  return [
+    {name:"Jour de l'An",date:new Date(year,0,1,12,0,0,0)},
+    {name:'Lundi de Pâques',date:addDays(easter,1)},
+    {name:'Fête du Travail',date:new Date(year,4,1,12,0,0,0)},
+    {name:'Victoire 1945',date:new Date(year,4,8,12,0,0,0)},
+    {name:'Ascension',date:addDays(easter,39)},
+    {name:'Lundi de Pentecôte',date:addDays(easter,50)},
+    {name:'Fête nationale',date:new Date(year,6,14,12,0,0,0)},
+    {name:'Assomption',date:new Date(year,7,15,12,0,0,0)},
+    {name:'Toussaint',date:new Date(year,10,1,12,0,0,0)},
+    {name:'Armistice 1918',date:new Date(year,10,11,12,0,0,0)},
+    {name:'Noël',date:new Date(year,11,25,12,0,0,0)}
+  ];
+}
+function publicHolidaysForWeek(monday){
+  const start=new Date(monday);start.setHours(12,0,0,0);
+  const end=addDays(start,4); // Le widget commande les repas du lundi au vendredi.
+  const years=[start.getFullYear(),end.getFullYear()];
+  const seen=new Set();
+  return [...new Set(years)].flatMap(publicHolidaysForYear).filter(h=>{
+    const key=h.date.toISOString().slice(0,10)+'|'+h.name;
+    if(seen.has(key))return false;seen.add(key);
+    return h.date>=start&&h.date<=end;
+  }).sort((a,b)=>a.date-b.date);
+}
 const DEFAULT_TEMPLATE=`Bonjour,\n\nVeuillez trouver ci-joint la commande repas du SAJ Anagallis pour la {{SEMAINE}}.\n\nJe vous remercie et vous souhaite une bonne journée.\n\nCordialement,\n\nSAJ Anagallis`;
 const TABLES={config:'Repas_Config',template:'Repas_Modele',weeks:'Repas_Semaines',cmd:'Repas_Commandes',guests:'Repas_Invites',closures:'Repas_Fermetures',settings:'Repas_Parametres',audit:'Repas_Journal'};
 const REQUIRED_DOM_IDS=['editor','weekPicker','weekYear','weekList','weekTitle','weekStatus','weekComment','saveWeekBtn','saveTemplateBtn','printBtn','pdfBtn','emailBtn','templateSettings','historyList','historyYear','peopleSettings','closureList','printArea','printSummaryPage','printDetailPage','summaryContent','detailContent','detailScale','toast'];
@@ -428,14 +469,20 @@ function schoolHolidayForWeek(monday){
 function renderSchoolHolidayBanner(){
   const el=ensureSchoolHolidayBanner();if(!el)return;
   const vac=schoolHolidayForWeek(weekStart);
-  if(!vac){el.hidden=true;el.textContent='';return}
-  const start=parseKey(vac.start);
-  if(vac.resume){
-    const resume=parseKey(vac.resume);
-    el.textContent=`Vacances scolaires – Académie de Lyon : ${vac.name} · départ ${frDate(start)} · reprise ${frDate(resume)}`;
-  }else{
-    el.textContent=`Vacances scolaires – Académie de Lyon : ${vac.name} · à partir du ${frDate(start)}`;
+  const holidays=publicHolidaysForWeek(weekStart);
+  if(!vac&&!holidays.length){el.hidden=true;el.textContent='';return}
+  const dm=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const lines=[];
+  if(vac){
+    const start=parseKey(vac.start);
+    const end=vac.resume?addDays(parseKey(vac.resume),-1):parseKey(vac.through);
+    const vacationLabels={Toussaint:'Vacances de la Toussaint','Noël':'Vacances de Noël',Hiver:"Vacances d'hiver",Printemps:'Vacances de printemps',Été:"Vacances d'été"};
+    lines.push(`${vacationLabels[vac.name]||('Vacances de '+vac.name)} du ${dm(start)} au ${dm(end)}`);
   }
+  if(holidays.length){
+    lines.push(holidays.map(h=>h.name).join(' · '));
+  }
+  el.innerHTML=lines.map(esc).join('<br>');
   el.hidden=false;
 }
 
@@ -475,7 +522,7 @@ function renderEditor(){
   $('editor').innerHTML=html;
   document.querySelectorAll('[data-group-sort]').forEach(s=>s.onchange=e=>{screenGroupSort[e.target.dataset.groupSort]=e.target.value;renderEditor()});
   document.querySelectorAll('[data-order-id]').forEach(s=>s.onchange=onOrderTypeChange);
-  document.querySelectorAll('[data-time-id]').forEach(x=>x.onchange=onExtraChange);
+  document.querySelectorAll('[data-time-hour-id],[data-time-minute-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-bread-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-picnic-id]').forEach(x=>x.onchange=onExtraChange);
   document.querySelectorAll('[data-propagate-id]').forEach(x=>x.onclick=openPropagateDialog);
@@ -514,10 +561,33 @@ function editorTable(people,c,isGuest=false,sortField='name',managePermanent=fal
   const professionalOnly=!isGuest && people.length>0 && people.every(p=>p.Groupe==='Professionnel');
   return `<table><thead><tr><th>Nom – Prénom</th><th>Régime</th>${professionalOnly?'':'<th>Texture</th>'}${DAYS.map(d=>`<th>${d.label}</th>`).join('')}${(isGuest||managePermanent)?'<th>Gestion</th>':''}</tr></thead><tbody>${sortPeopleSimple(people,sortField).map(p=>{const rows=c.filter(x=>x.PersonKey===p.PersonKey);const cfg=config.find(x=>x.PersonKey===p.PersonKey);return `<tr><td class="name">${esc(p.Nom)} ${esc(p.Prenom)}</td><td class="meta-cell editable-profile">${profileSelectHtml(p,'Regime',isGuest)}</td>${professionalOnly?'':`<td class="meta-cell editable-profile">${profileSelectHtml(p,'Texture',isGuest)}</td>`}${DAYS.map(d=>editorDayCell(rows.find(x=>x.Jour===d.key))).join('')}${isGuest?`<td><button class="mini danger" data-remove-guest="${p.guest.id}">Retirer</button></td>`:managePermanent&&cfg?`<td class="manage-cell"><button class="mini" data-edit-permanent="${esc(p.PersonKey)}">Modifier</button><button class="mini danger" data-remove-permanent="${esc(p.PersonKey)}">Retirer</button></td>`:''}</tr>`}).join('')}</tbody></table>`}
 function editorDayCell(c){if(!c)return'<td>—</td>';const closed=c.TypeCommande==='Fermé';const mealClass='meal-'+norm(c.TypeCommande).replace(/[^a-z0-9]+/g,'-');return `<td class="day-cell ${closed?'closed-cell':''} ${mealClass}">${closed?'<b>FERMÉ</b>':`<div class="order-line"><select class="order-select" data-order-id="${c.id}">${TYPES.map(t=>`<option value="${esc(t)}" ${c.TypeCommande===t?'selected':''}>${t}</option>`).join('')}</select><button class="mini propagate" type="button" title="Appliquer aux semaines suivantes" data-propagate-id="${c.id}">↪</button></div>${extrasHtml(c)}`}</td>`}
-function extrasHtml(c){if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';let s=`<div class="extra-row"><input type="time" step="900" title="Heure de retrait (00, 15, 30 ou 45 minutes)" data-time-id="${c.id}" value="${esc(normalizeQuarterHour(c.HeureRetrait||''))}">`;if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;return s+'</div>'}
+function extrasHtml(c){
+  if(!['Plateau','Container','Pique-nique'].includes(c.TypeCommande))return'';
+  const normalized=normalizeQuarterHour(c.HeureRetrait||'');
+  const [hour='--',minute='--']=normalized?normalized.split(':'):['--','--'];
+  const hourOptions=['--',...Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))].map(v=>`<option value="${v==='--'?'':v}" ${hour===v?'selected':''}>${v}</option>`).join('');
+  const minuteOptions=['--','00','15','30','45'].map(v=>`<option value="${v==='--'?'':v}" ${minute===v?'selected':''}>${v}</option>`).join('');
+  let s=`<div class="extra-row"><select aria-label="Heure de retrait" title="Heure" data-time-hour-id="${c.id}">${hourOptions}</select><span class="time-separator">:</span><select aria-label="Minutes de retrait" title="Minutes : 00, 15, 30 ou 45" data-time-minute-id="${c.id}">${minuteOptions}</select>`;
+  if(c.TypeCommande==='Pique-nique')s+=`<select data-bread-id="${c.id}"><option ${c.Pain==='Pain'?'selected':''}>Pain</option><option ${c.Pain==='Pain de mie'?'selected':''}>Pain de mie</option></select><select data-picnic-id="${c.id}"><option value="" ${!c.OptionPique?'selected':''}>Standard</option><option ${c.OptionPique==='Sans porc'?'selected':''}>Sans porc</option><option ${c.OptionPique==='Sans viande'?'selected':''}>Sans viande</option></select>`;
+  return s+'</div>';
+}
 
-async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const type=e.target.value;const old=commands.find(x=>x.id===id);if(!old)return;await updateCmd(id,{TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(old.HeureRetrait||''):'',Pain:type==='Pique-nique'?(old.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(old.OptionPique||''):''},`Type de repas : ${old.TypeCommande} → ${type}`)}
-async function onExtraChange(e){const id=+(e.target.dataset.timeId||e.target.dataset.breadId||e.target.dataset.picnicId);const field=e.target.dataset.timeId?'HeureRetrait':e.target.dataset.breadId?'Pain':'OptionPique';const old=commands.find(x=>x.id===id);const value=field==='HeureRetrait'?normalizeQuarterHour(e.target.value):e.target.value;if(field==='HeureRetrait')e.target.value=value;await updateCmd(id,{[field]:value},`${field} : ${old?.[field]||'—'} → ${value||'—'}`)}
+async function onOrderTypeChange(e){const id=+e.target.dataset.orderId;const type=e.target.value;const old=commands.find(x=>x.id===id);if(!old)return;await updateCmd(id,{TypeCommande:type,HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?normalizeQuarterHour(old.HeureRetrait||''):'',Pain:type==='Pique-nique'?(old.Pain||'Pain'):'',OptionPique:type==='Pique-nique'?(old.OptionPique||''):''},`Type de repas : ${old.TypeCommande} → ${type}`)}
+async function onExtraChange(e){
+  const id=+(e.target.dataset.timeHourId||e.target.dataset.timeMinuteId||e.target.dataset.breadId||e.target.dataset.picnicId);
+  const old=commands.find(x=>+x.id===id);if(!old)return;
+  if(e.target.dataset.timeHourId!==undefined||e.target.dataset.timeMinuteId!==undefined){
+    const row=e.target.closest('.extra-row');
+    const h=row?.querySelector('[data-time-hour-id]')?.value||'';
+    const m=row?.querySelector('[data-time-minute-id]')?.value||'';
+    const value=(h&&m)?`${h}:${m}`:'';
+    await updateCmd(id,{HeureRetrait:value},`HeureRetrait : ${old.HeureRetrait||'—'} → ${value||'—'}`);
+    return;
+  }
+  const field=e.target.dataset.breadId!==undefined?'Pain':'OptionPique';
+  const value=e.target.value;
+  await updateCmd(id,{[field]:value},`${field} : ${old?.[field]||'—'} → ${value||'—'}`);
+}
 async function updateCmd(id,fields,detail='Modification de repas'){
   const old=commands.find(x=>+x.id===+id);if(!old)return;
   // Sécurité d'enregistrement : si une ancienne version a créé des doublons pour la même
@@ -1419,7 +1489,7 @@ function bindUI(){
   $('checkOrder').onclick=showValidation;$('absenceBtn').onclick=openAbsenceDialog;$('absenceForm').addEventListener('submit',applyAbsenceRange);$('propagateForm').addEventListener('submit',applyPropagation);$('unlockArchive').onclick=unlockArchivedWeek;
   $('printBtn').onclick=handlePrintClick;$('pdfBtn').onclick=handlePdfClick;$('emailBtn').onclick=openEmailDialog;
   $('logoFile').onchange=onLogoFileChange;$('removeLogo').onclick=removeLogo;
-  $('addPerson').onclick=()=>openPersonDialog();configurePersonDialogUI();$('personForm').addEventListener('submit',savePersonFromDialog);
+  $('addPerson').onclick=()=>openPersonDialog();configurePersonDialogUI();configurePersonDialogCancel();$('personForm').addEventListener('submit',savePersonFromDialog);
   $('guestForm').addEventListener('submit',saveGuestFromDialog);configureGuestDialogCancel();
   $('closureForm').addEventListener('submit',saveClosure);
   $('saveEmailSettings').onclick=saveEmailSettings;
@@ -1474,7 +1544,7 @@ async function flushVisibleOrderSelections(){
     const type=sel.value;const td=sel.closest('td');
     const fields={
       TypeCommande:type,
-      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?normalizeQuarterHour(td?.querySelector('[data-time-id]')?.value||row.HeureRetrait||''):'',
+      HeureRetrait:['Plateau','Container','Pique-nique'].includes(type)?(()=>{const h=td?.querySelector('[data-time-hour-id]')?.value||'';const m=td?.querySelector('[data-time-minute-id]')?.value||'';return h&&m?`${h}:${m}`:normalizeQuarterHour(row.HeureRetrait||'')})():'',
       Pain:type==='Pique-nique'?(td?.querySelector('[data-bread-id]')?.value||row.Pain||'Pain'):'',
       OptionPique:type==='Pique-nique'?(td?.querySelector('[data-picnic-id]')?.value||row.OptionPique||''):''
     };
@@ -1549,16 +1619,32 @@ async function resetWeekFromTemplate(){if(!confirm('Réinitialiser cette semaine
 async function recreateGuestCommands(){const key=weekKey(weekStart);const actions=[];currentGuests().forEach(g=>DAYS.forEach(d=>{const date=addDays(weekStart,d.offset);const closed=closureFor(date);actions.push(['AddRecord',TABLES.cmd,null,{SemaineKey:key,PersonKey:g.PersonKey,SourceType:g.TypePersonne,SourceId:g.id,Nom:g.Nom,Prenom:g.Prenom,Groupe:'Stagiaire / Visiteur',Regime:g.Regime,Texture:g.Texture,Jour:d.key,DateJour:gristDate(addDays(weekStart,d.offset)),Annee:weekStart.getFullYear(),TypeCommande:closed?'Fermé':(g[d.key]?'Repas sur place':'Absent'),HeureRetrait:'',Pain:'Pain',OptionPique:'',NoteCuisine:''}])}));if(actions.length)await grist.docApi.applyUserActions(actions)}
 
 function configurePersonDialogUI(){
-  // Création directe uniquement : ne plus proposer de personnes « existantes ».
-  const source=$('personSource');if(source){source.value='manual';const label=source.closest('label');if(label)label.hidden=true}
-  const sourceWrap=$('sourceSelectWrap');if(sourceWrap)sourceWrap.hidden=true;
-  // Les dates Début / Fin ne concernent pas un usager ou un professionnel permanent.
+  // Création directe uniquement : aucun choix « usager/professionnel existant ».
+  const source=$('personSource');
+  if(source){
+    source.value='manual';
+    source.hidden=true;
+    source.style.display='none';
+    const label=source.closest('label');
+    if(label){label.hidden=true;label.style.display='none'}
+  }
+  const sourceWrap=$('sourceSelectWrap');
+  if(sourceWrap){sourceWrap.hidden=true;sourceWrap.style.display='none'}
+  // Les dates Début / Fin ne sont pas affichées pour un usager ou un professionnel permanent.
   const start=$('personStart'),end=$('personEnd');
-  const dateWrap=start?.closest('.two')||end?.closest('.two');if(dateWrap)dateWrap.hidden=true;
-  if(start)start.tabIndex=-1;if(end)end.tabIndex=-1;
+  const dateWrap=start?.closest('.two')||end?.closest('.two');
+  if(dateWrap){dateWrap.hidden=true;dateWrap.style.display='none'}
+  if(start){start.hidden=true;start.style.display='none';start.tabIndex=-1}
+  if(end){end.hidden=true;end.style.display='none';end.tabIndex=-1}
+}
+function configurePersonDialogCancel(){
+  const dialog=$('personDialog'),form=$('personForm');if(!dialog||!form)return;
+  const cancel=$('cancelPerson')||form.querySelector('button[value="cancel"]');if(!cancel)return;
+  cancel.type='button';
+  cancel.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();dialog.close();};
 }
 function openPersonDialog(p=null,forcedGroup=''){
-  configurePersonDialogUI();
+  configurePersonDialogUI();configurePersonDialogCancel();
   const group=forcedGroup||p?.Groupe||'RDC';
   const isPro=group==='Professionnel';
   $('personDialogTitle').textContent=p?(isPro?'Modifier le professionnel':'Modifier l’usager'):(isPro?'Ajouter un professionnel':'Ajouter un usager');
@@ -1618,9 +1704,9 @@ async function syncConfigToFutureWeeks(personKey,{updateProfile=false,excludeWee
 
 function configureGuestDialogCancel(){
   const dialog=$('guestDialog'),form=$('guestForm');if(!dialog||!form)return;
-  const cancel=form.querySelector('button[value="cancel"]');if(!cancel)return;
+  const cancel=$('cancelGuest')||form.querySelector('button[value="cancel"]');if(!cancel)return;
   cancel.type='button';
-  cancel.onclick=()=>{dialog.close();form.reset();fillStaticSelects()};
+  cancel.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();dialog.close();form.reset();fillStaticSelects()};
 }
 function openGuestDialog(){
   const form=$('guestForm');if(form)form.reset();fillStaticSelects();configureGuestDialogCancel();$('guestDialog').showModal();

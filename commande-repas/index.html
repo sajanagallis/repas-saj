@@ -156,16 +156,17 @@
   <dialog id="personDialog"><form id="personForm" method="dialog">
     <h3 id="personDialogTitle">Ajouter une personne</h3>
     <input type="hidden" id="personConfigId">
-    <label>Source <select id="personSource"><option value="manual">Nouvelle personne</option><option value="user">Usager existant</option><option value="pro">Professionnel existant</option></select></label>
-    <label id="sourceSelectWrap" hidden>Personne <select id="sourcePerson"></select></label>
+    <input type="hidden" id="personSource" value="manual">
+    <input type="hidden" id="sourcePerson" value="">
     <div class="two"><label>Prénom <input id="personFirst"></label><label>Nom <input id="personLast"></label></div>
     <label>Lieu / groupe <select id="personGroup"><option>RDC</option><option>1er étage</option><option>Professionnel</option></select></label>
     <label>Régime <select id="personDiet"></select></label>
     <label>Texture <select id="personTexture"></select></label>
     <fieldset><legend>Présence habituelle</legend><div id="personDays" class="checks"></div></fieldset>
-    <div class="two"><label>Début <input id="personStart" type="date"></label><label>Fin <input id="personEnd" type="date"></label></div>
+    <input type="hidden" id="personStart" value="">
+    <input type="hidden" id="personEnd" value="">
     <label class="checkline"><input id="personActive" type="checkbox" checked> Personne active</label>
-    <div class="dialog-actions"><button value="cancel">Annuler</button><button id="savePerson" value="default" class="primary">Enregistrer</button></div>
+    <div class="dialog-actions"><button type="button" id="cancelPerson">Annuler</button><button type="submit" id="savePerson" value="default" class="primary">Enregistrer</button></div>
   </form></dialog>
 
   <dialog id="guestDialog"><form id="guestForm" method="dialog">
@@ -175,7 +176,7 @@
     <label>Lieu <select id="guestFloor"><option>RDC</option><option>1er étage</option></select></label>
     <label>Régime <select id="guestDiet"></select></label><label>Texture <select id="guestTexture"></select></label>
     <fieldset><legend>Jours de présence</legend><div id="guestDays" class="checks"></div></fieldset>
-    <div class="dialog-actions"><button value="cancel">Annuler</button><button id="saveGuest" value="default" class="primary">Ajouter</button></div>
+    <div class="dialog-actions"><button type="button" id="cancelGuest">Annuler</button><button type="submit" id="saveGuest" value="default" class="primary">Ajouter</button></div>
   </form></dialog>
 
   <dialog id="absenceDialog"><form id="absenceForm" method="dialog">
@@ -211,6 +212,6 @@
     <div class="dialog-actions"><button value="cancel">Annuler</button><button id="createDraft" value="default" class="primary">Créer le brouillon Outlook</button></div>
   </form></dialog>
 
-  <script src="script.js?v=40"></script>
+  <script src="script.js?v=44"></script>
 </body>
 </html>
