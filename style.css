@@ -1,590 +1,1084 @@
-:root {
-  --ink: #183042;
-  --muted: #687883;
-  --line: #dbe5ea;
-  --paper: #ffffff;
-  --bg: #eef3f6;
-  --accent: #711aa2;
-  --accent-soft: #f4eafd;
-  --soft: #e9f4f5;
-  --shadow: 0 8px 30px rgba(23,48,66,.17);
+root{
+  --navy:#0b2f62;--text:#17324a;--muted:#6b7b88;--line:#cbd9e3;--soft:#f4f7fa;--white:#fff;
+  --rdc:#b8efc5;--floor:#addcff;--pro:#dcc4ff;--guest:#ffc5df;--tray:#ffd2a3;--container:#a9f2df;--picnic:#ffe79e;
+  --hypo:#8b5cf6;--hypolipid:#ffffff;--pork:#9a6848;--meat:#9a6848;--puree:#49b96f;--hache:#df3d3d;
+}
+*{box-sizing:border-box}html,body{margin:0}body{font-family:Arial,Helvetica,sans-serif;background:#f3f6f8;color:var(--text);font-size:14px}button,input,select,textarea{font:inherit}button{cursor:pointer;border:1px solid #b8c7d1;border-radius:8px;background:#fff;padding:8px 11px;color:var(--text)}button:hover{background:#f7fafc}.primary{background:var(--navy);border-color:var(--navy);color:#fff}.secondary{background:#eef5fb}.full{width:100%}label{display:block;font-size:12px;font-weight:700;color:#516777}input,select,textarea{width:100%;border:1px solid #b9c8d2;border-radius:6px;padding:7px;background:#fff;color:var(--text);margin-top:4px}textarea{resize:vertical}.hint{font-size:12px;color:var(--muted);line-height:1.45}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;position:sticky;top:0;z-index:10}.brand-small{font-size:10px;letter-spacing:.12em;font-weight:700;color:#537089}.brand h1{margin:3px 0 0;font-size:22px;color:var(--navy)}.tabs{display:flex;gap:5px;flex-wrap:wrap}.tab{border:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0}.tab.active{color:var(--navy);font-weight:700;border-bottom-color:var(--navy);background:#eef4f9}.app{max-width:1500px;margin:16px auto;padding:0 14px}.tab-panel{display:none}.tab-panel.active{display:block}.workspace{display:grid;grid-template-columns:235px 1fr;gap:14px}.sidebar,.content,.panel-card{background:#fff;border:1px solid var(--line);border-radius:12px}.sidebar{padding:14px;align-self:start;position:sticky;top:86px}.sidebar h2{font-size:15px;margin:0 0 10px}.sidebar h3{font-size:12px;margin:18px 0 7px;color:#5c7283}.nav-row{display:grid;grid-template-columns:38px 1fr 38px;gap:5px;margin-bottom:10px}.week-list{display:flex;flex-direction:column;gap:5px;max-height:380px;overflow:auto}.week-link{display:flex;justify-content:space-between;text-align:left;padding:7px;border-radius:7px;border:1px solid transparent;font-size:12px}.week-link.active{background:#eaf2f8;border-color:#b9d0df}.status{font-size:10px;padding:2px 5px;border-radius:10px;background:#edf2f5;color:#5f7180}.status.commandee{background:#dcf2e3;color:#2a6b3d}.status.archivee{background:#ececef}.content{padding:14px;min-width:0}.week-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:12px}.week-head h2{font-size:25px;color:#d11f1f;margin:3px 0}.eyebrow{font-size:10px;letter-spacing:.12em;font-weight:700;color:#698092}.head-actions{display:flex;gap:7px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end}.head-actions label{min-width:120px}.closure-banner,.print-closure{background:#b91c1c;color:#fff;font-weight:800;text-align:center;border-radius:7px;padding:10px;margin-top:8px;font-size:18px;letter-spacing:.03em}.sortbar{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;padding:10px 0}.sortbar label{min-width:130px}.sortbar strong{padding-bottom:8px}.editor-group{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:9px 0}.group-title{padding:8px 10px;font-size:16px;font-weight:800;color:#0f2d57;display:flex;justify-content:space-between}.g-rdc .group-title{background:var(--rdc)}.g-floor .group-title{background:var(--floor)}.g-pro .group-title{background:var(--pro)}.g-guest .group-title{background:var(--guest)}table{border-collapse:collapse;width:100%}th,td{border:1px solid var(--line);padding:5px 6px;text-align:center}th{background:#edf4f8;font-size:11px}.name{text-align:left;font-weight:700}.meta-cell{text-align:left;white-space:nowrap}.day-cell{min-width:128px}.order-select{min-width:112px;padding:4px;margin:0}.extra-row{display:flex;gap:4px;margin-top:4px}.extra-row input,.extra-row select{padding:3px;font-size:11px;margin:0}.extra-row input{width:70px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;margin-right:5px}.dot-hypo{background:var(--hypo)}.dot-hypolipid{background:var(--hypolipid)}.dot-pork{background:var(--pork)}.dot-meat{background:var(--meat)}.dot-puree{background:var(--puree)}.dot-hache{background:var(--hache)}.week-notes{display:grid;grid-template-columns:1fr 180px;gap:12px;margin-top:10px}.save-state{align-self:end;color:#438258;font-size:12px;padding-bottom:8px}.settings-grid{display:grid;gap:14px}.panel-card{padding:16px}.panel-card h2{margin-top:0;color:var(--navy)}.panel-title{display:flex;justify-content:space-between;gap:10px;align-items:center}.inline-form{display:grid;grid-template-columns:160px 160px 1fr 100px;gap:8px;align-items:end}.settings-table td,.settings-table th{font-size:12px}.mini{font-size:11px;padding:4px 6px}.danger{color:#9d2e2e;border-color:#e2bcbc}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.checks{display:flex;gap:10px;flex-wrap:wrap}.checks label{display:flex;gap:4px;align-items:center}.checks input,.checkline input{width:auto;margin:0}.checkline{display:flex;gap:7px;align-items:center}fieldset{border:1px solid var(--line);border-radius:7px;margin:10px 0;padding:9px}legend{font-size:12px;font-weight:700}.history-row{display:grid;grid-template-columns:1fr 130px 120px;gap:8px;padding:9px;border-bottom:1px solid var(--line);align-items:center}.history-row button{text-align:left;border:0;padding:0;font-weight:700}.toast{position:fixed;right:18px;bottom:18px;background:#17324a;color:#fff;padding:10px 13px;border-radius:8px;z-index:99}dialog{border:0;border-radius:12px;box-shadow:0 15px 60px #0005;padding:0;max-width:620px;width:min(94vw,620px)}dialog form{padding:18px}dialog h3{margin:0 0 12px;color:var(--navy)}dialog label{margin:9px 0}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.help p{line-height:1.5}
+#printArea{display:none}.print-page{background:#fff;color:#102b4f;position:relative}
+/* V28 — zone PDF rendue hors écran mais réellement mise en page pendant la capture.
+   html2canvas ne peut pas capturer un élément display:none. */
+#pdfCaptureHost{position:fixed;left:-20000px;top:0;z-index:-9999;background:#fff;pointer-events:none}
+#pdfCaptureHost #printArea{display:block!important}
+#pdfCaptureHost .print-page{box-sizing:border-box;overflow:hidden;background:#fff}
+#pdfCaptureHost .page-summary{width:210mm;height:297mm;padding:6mm}
+#pdfCaptureHost .page-detail{width:210mm;height:297mm;padding:6mm}
+#pdfCaptureHost .page-summary #summaryContent{max-height:266mm;overflow:hidden}
+#pdfCaptureHost .page-detail #detailScale{max-height:none;overflow:visible}
+.print-page{background:#fff;color:#102b4f;position:relative}.print-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #294f72;padding-bottom:2.5mm;margin-bottom:2mm}.print-header .org{font-weight:800;font-size:12pt}.print-header .org span{display:block;font-size:7.5pt;font-weight:500}.print-header h1{font-size:17pt;margin:2mm 0 .5mm;color:#0b2f62}.print-header h2{font-size:11pt;color:#d71919;margin:0}.odyneo{font-size:14pt}.print-page footer{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;font-size:6.5pt;color:#183b64;border-top:1px solid #d4e0e8;padding-top:1.2mm}.print-section{margin:2.2mm 0}.print-section-title{font-size:10.5pt;font-weight:800;padding:1.5mm 2.5mm;color:#102d57;display:flex;justify-content:space-between}.band-rdc{background:var(--rdc)}.band-floor{background:var(--floor)}.band-pro{background:var(--pro)}.band-guest{background:var(--guest)}.band-tray{background:var(--tray)}.band-container{background:var(--container)}.band-picnic{background:var(--picnic)}.print-page table{font-size:7.3pt}.print-page th,.print-page td{padding:1.1mm 1.4mm}.print-page th{font-size:6.9pt;background:#edf4f8}.print-page td:first-child,.print-page th:first-child{text-align:left}.total-row{font-weight:800}.total-rdc td{background:var(--rdc)}.total-floor td{background:var(--floor)}.total-pro td{background:var(--pro)}.total-guest td{background:var(--guest)}.total-tray td{background:var(--tray)}.total-container td{background:var(--container)}.total-picnic td{background:var(--picnic)}.total-general td{background:#e6f0f6;font-weight:800}.legend-wrap{display:flex;justify-content:space-between;gap:10mm;margin-top:2mm;font-size:6.5pt}.legend{display:flex;gap:3mm;flex-wrap:wrap}.print-comment{background:#edf4f8;border-radius:3px;min-height:10mm;padding:2mm;margin-top:2mm;font-size:7pt}.closed-cell{background:#f5d0d0!important;color:#8a1717;font-weight:800}.special-grid-print{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm}.special-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm}.compact-special{margin:1.2mm 0}.compact-special .print-section-title{font-size:8.5pt}.compact-special table{font-size:6.8pt}.detail-person-table td,.detail-person-table th{white-space:nowrap}.detail-person-table .name{max-width:36mm;overflow:hidden;text-overflow:ellipsis}.detail-total{font-weight:800}.meal-code{font-weight:800}.print-closure{font-size:11pt;padding:2mm;margin:1.5mm 0}.page-detail #detailScale{transform-origin:top left}
+
+@media(max-width:1000px){.workspace{grid-template-columns:1fr}.sidebar{position:static}.week-head{flex-direction:column}.inline-form{grid-template-columns:1fr 1fr}.week-notes{grid-template-columns:1fr}.day-cell{min-width:112px}}
+
+@media print{
+  @page summary{size:A4 portrait;margin:6mm}
+  @page detail{size:A4 portrait;margin:6mm}
+  body{background:#fff}.no-print{display:none!important}#printArea{display:block!important}
+  .print-page{overflow:hidden;break-after:page;page-break-after:always}
+  .page-summary{page:summary;width:198mm;height:285mm}
+  .page-detail{page:detail;width:198mm;height:285mm;break-after:auto;page-break-after:auto}
+  .page-summary #summaryContent{max-height:260mm;overflow:hidden}
+  .page-detail #detailScale{max-height:none;overflow:visible}
 }
 
-* { box-sizing: border-box; }
+.history-year-label{min-width:150px}.history-year-label select{margin-top:4px}.history-row{grid-template-columns:1fr 90px 130px 130px}.history-head{display:grid;grid-template-columns:1fr 90px 130px 130px;gap:8px;padding:6px 9px;font-size:11px;font-weight:700;color:#607586;border-bottom:2px solid var(--line)}
 
-html, body {
-  margin: 0;
-  min-height: 100%;
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  color: var(--ink);
-  background: var(--bg);
-}
+/* Logo configurable */
+.screen-logo{height:46px;max-width:150px;object-fit:contain;margin-left:auto}.logo-settings{display:grid;grid-template-columns:220px 1fr;gap:18px;align-items:center}.logo-preview-wrap{height:110px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fafcfd;padding:10px}.logo-preview{max-width:100%;max-height:90px;object-fit:contain}.logo-empty{font-size:12px;color:#718493;text-align:center}.logo-actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}.file-button{display:inline-flex;align-items:center;border:1px solid #9fb4c4;border-radius:7px;padding:7px 10px;background:#fff;cursor:pointer;font-size:13px}.file-button:hover{background:#f3f7fa}.logo-actions .hint{width:100%;margin:2px 0 0}.print-logo-wrap{width:44mm;min-height:18mm;display:flex;justify-content:flex-end;align-items:flex-start}.print-logo{max-width:44mm;max-height:18mm;object-fit:contain}.print-meta{font-size:6.5pt;color:#183b64;margin-top:1mm}
+@media(max-width:800px){.logo-settings{grid-template-columns:1fr}.screen-logo{display:none!important}}
 
-.toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 12px 20px;
-  background: #fff;
-  border-bottom: 1px solid var(--line);
-  box-shadow: 0 3px 12px rgba(23,48,66,.12);
-}
+/* Interface consolidée */
+.dashboard{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:8px;margin:12px 0 6px}.dash-card{border:1px solid var(--line);border-radius:9px;padding:9px;background:#f9fbfc}.dash-card b{display:block;font-size:18px;color:var(--navy);margin-top:3px}.dash-card small{color:var(--muted)}.dash-card.warn{background:#fff6df;border-color:#eed39a}.dash-card.good{background:#edf8f0;border-color:#b9ddc1}.dash-card.alert{background:#fdecec;border-color:#edb2b2}.safety-actions{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.week-link.alert-due{border-color:#d98c8c;background:#fff0f0}.week-link.alert-soon{border-color:#e4c884;background:#fff9e8}.week-link.rectificative{box-shadow:inset 3px 0 #d47a00}.order-line{display:flex;align-items:center;gap:4px}.order-line .order-select{flex:1}.propagate{padding:3px 6px;line-height:1}.note-input{min-width:120px;padding:4px;margin:0;font-size:11px}.audit-panel{margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#fbfcfd}.audit-panel summary{cursor:pointer;padding:9px 11px;font-weight:700;color:var(--navy)}.audit-row{display:grid;grid-template-columns:120px 120px 100px 1fr;gap:8px;padding:7px 10px;border-top:1px solid var(--line);font-size:11px}.audit-row .audit-detail{text-align:left}.audit-empty{padding:10px;color:var(--muted);font-size:12px}.validation-ok{padding:10px;border-radius:7px;background:#edf8f0;color:#2f6d40;font-weight:700}.validation-errors{margin:0;padding-left:20px}.validation-errors li{margin:6px 0}.editor.locked{opacity:.7;pointer-events:none}.rectificative-banner{background:#fff0cf;border:1px solid #e4b85c;color:#7a4c00;font-weight:800;text-align:center;padding:1.5mm;margin:1.5mm 0;border-radius:3px}.person-note-print{font-size:6pt;color:#5c6872;font-weight:400;display:block;white-space:normal;margin-top:.4mm}.state-line{font-size:11px;color:#607586;margin-top:4px}.status.rectificative{background:#fff0cf;color:#875600}.status.a-verifier{background:#fde3e3;color:#8a2323}
+@media(max-width:1100px){.dashboard{grid-template-columns:repeat(2,1fr)}}
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.save-week-btn{font-weight:800;border-color:#4f8a62;background:#f5fbf7;color:#28613a}.save-week-btn:hover{background:#eaf7ee}.save-week-btn.saving{opacity:.65;pointer-events:none}
 
-.brand-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 800;
-}
 
-.brand h1 {
-  font-size: 18px;
-  margin: 0;
-}
+/* Interface consolidée */
+.template-settings{overflow-x:auto}
+.template-table{min-width:1180px}
+.template-table .day-cell{min-width:150px;vertical-align:top}
+.template-table .order-select{width:100%;min-width:130px}
+.template-table .extra-row{margin-top:5px;display:flex;gap:4px;flex-wrap:wrap}
+.template-table .extra-row input,.template-table .extra-row select{max-width:130px}
 
-.brand p {
-  font-size: 12px;
-  margin: 2px 0 0;
-  color: var(--muted);
-}
+/* Interface consolidée */
+.model-page{padding:18px}.model-title{align-items:flex-start}.model-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:720px}.model-info{margin:10px 0;padding:10px 12px;border:1px solid #c9d9e4;border-radius:8px;background:#f5f9fb;color:#34516a;font-size:12px}.model-meta{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 12px;padding:8px 10px;background:#fbfcfd;border:1px solid var(--line);border-radius:7px;font-size:12px;color:#536b7d}.model-meta b{color:var(--navy)}
+#tab-modele .template-settings{max-width:100%;overflow:auto;border:1px solid var(--line);border-radius:8px}
+#tab-modele .template-table{margin:0;min-width:1400px}
+#tab-modele .template-table th{position:sticky;top:0;z-index:2}
+#tab-modele .template-table .sticky-name{position:sticky;left:0;z-index:1;background:#fff;min-width:170px}
+#tab-modele .template-table .sticky-group{position:sticky;left:170px;z-index:1;background:#fff;min-width:95px}
+#tab-modele .template-table th:first-child{left:0;z-index:4}
+#tab-modele .template-table th:nth-child(2){left:170px;z-index:4}
+@media(max-width:900px){.model-title{flex-direction:column}.model-actions{justify-content:flex-start}}
 
-.controls {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.controls label {
-  display: grid;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-select, button, input[type="file"] {
-  min-height: 38px;
-  border: 1px solid #c8d5db;
-  border-radius: 5px;
-  background: #fff;
-  padding: 0 11px;
-  color: var(--ink);
-}
-
-input[type="file"] {
-  width: 180px;
-  padding: 8px;
-  font-size: 11px;
-}
-
-button {
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button.secondary {
-  background: #e8eff2;
-  color: var(--ink);
-}
-
-#app { padding: 22px; }
-
-.status {
-  max-width: 900px;
-  margin: 45px auto;
-  padding: 28px;
-  text-align: center;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-}
-
-.status.error { color: #a43434; }
-.hidden { display: none !important; }
-
-.sheet {
-  max-width: 1050px;
-  margin: 0 auto;
-  background: var(--paper);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  padding: 24px;
-}
-
-.sheet-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 18px;
-  padding-bottom: 15px;
-}
-
-.eyebrow {
-  margin: 0 0 5px;
-  font-size: 11px;
-  letter-spacing: .16em;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.sheet h2 {
-  font-size: 28px;
-  line-height: 1.08;
-  margin: 0;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 12px;
-  margin: 5px 0 0;
-}
-
-.logo-wrap {
-  width: 135px;
-  min-width: 135px;
-  height: 82px;
-  display: grid;
-  place-items: center;
-}
-
-.site-logo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.logo-placeholder {
-  width: 100px;
-  height: 56px;
-  border: 2px dashed #c7d4da;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  color: #87959d;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .14em;
-}
-
-.room-visual {
-  margin: 0;
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #f5f8fa;
-}
-
-.room-visual img {
-  display: block;
-  width: 100%;
-  height: clamp(260px, 34vw, 430px);
-  object-fit: cover;
-  object-position: center center;
-  background: #edf2f4;
-}
-
-.room-visual figcaption {
-  padding: 8px 12px;
-  background: linear-gradient(90deg, var(--accent), #8d35b8);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .04em;
-}
-
-.people-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 15px;
-  margin: 22px 0 12px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 10px;
-}
-
-.people-heading h3 {
-  margin: 0;
-  font-size: 19px;
-}
-
-.count-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.people-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(95px, 1fr));
-  gap: 15px 14px;
-  min-height: 150px;
-}
-
-.person-card {
-  display: grid;
-  justify-items: center;
-  gap: 7px;
-  padding: 8px 6px 10px;
-  border-radius: 10px;
-  background: #fbfcfd;
-  border: 1px solid #e4ecef;
-  break-inside: avoid;
-}
-
-.person-photo {
-  width: 86px;
-  height: 86px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--soft);
-  border: 2px solid #cfe2e5;
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-  font-size: 28px;
-  font-weight: 800;
-}
-
-.person-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.person-name {
-  width: 100%;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.1;
-}
-
-.empty {
-  grid-column: 1 / -1;
-  padding: 30px;
-  border: 1px dashed #cbd7dc;
-  border-radius: 10px;
-  text-align: center;
-  color: var(--muted);
-  background: #fbfcfd;
-}
-
-.sheet-foot {
-  text-align: center;
-  color: #86959d;
-  font-size: 9px;
-  margin-top: 18px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
-}
-
-dialog {
-  border: 0;
-  border-radius: 8px;
-  max-width: 620px;
-  box-shadow: 0 20px 60px #0003;
-}
-
-dialog pre {
-  white-space: pre-wrap;
-  background: #f5f7f8;
-  padding: 12px;
-  border-radius: 4px;
-}
-
-@media (max-width: 900px) {
-  .toolbar {
-    align-items: flex-start;
-    flex-direction: column;
+/* =====================================================================
+   V8 — INTERFACE ÉCRAN ALIGNÉE SUR LE VISUEL DU PRINT
+   Objectif : lecture immédiate, couleurs douces, grands contrôles,
+   tableau principal prioritaire. Les règles @media print restent intactes.
+   ===================================================================== */
+@media screen {
+  :root{
+    --screen-bg:#f6fbff;
+    --screen-line:#cfe0ec;
+    --screen-blue:#0f5fa8;
+    --screen-navy:#0c2f63;
+    --screen-green:#0aa66a;
+    --screen-purple:#7741d7;
+    --screen-red:#da3348;
+    --screen-yellow:#f5c84a;
   }
-  .people-grid {
-    grid-template-columns: repeat(4, minmax(90px, 1fr));
+
+  body{background:linear-gradient(180deg,#f8fcff 0,#f3f8fc 100%);font-size:14px;color:#102b4f}
+  .topbar{
+    min-height:86px;padding:0 20px;gap:18px;background:#fff;border-bottom:1px solid #c9ddea;
+    box-shadow:0 2px 10px #274f7210;position:sticky;top:0;z-index:20;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:255px}
+  .brand-symbol{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:38px;color:#15845d;background:#e9f8ef;font-weight:900}
+  .brand h1{font-size:24px;margin:0;color:var(--screen-navy);line-height:1}
+  .brand-small{font-size:13px;letter-spacing:0;color:#355879;margin-top:6px;text-transform:none}
+  .app-title-block{display:flex;align-items:center;gap:12px;min-width:310px}
+  .meal-icon{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#1579be,#074c92);font-size:29px;color:#fff}
+  .app-title-block strong{display:block;font-size:31px;line-height:1;color:#0b2d5f}
+  .app-title-block small{display:block;margin-top:5px;color:#45657f;font-size:13px}
+  .screen-logo{height:48px;max-width:135px;margin-left:4px}
+  .tabs{margin-left:auto;align-self:stretch;display:flex;gap:3px;flex-wrap:nowrap}
+  .tab{min-width:112px;height:86px;border-radius:0;padding:11px 10px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#304d6a;border-bottom:4px solid transparent;background:#fff;font-weight:700;font-size:12px}
+  .tab-ico{font-size:25px;line-height:1;color:#46627c}
+  .tab.active{background:#e8f4ff;border-bottom-color:#0d67ad;color:#064e8a}
+  .tab.active .tab-ico{color:#075c9e}
+
+  .app{max-width:none;margin:14px auto 24px;padding:0 18px}
+  .workspace{display:block}
+  .sidebar,.content{box-shadow:none}
+  .sidebar{
+    position:static;width:100%;padding:11px 14px;margin-bottom:10px;border:1px solid var(--screen-line);border-radius:10px;
+    background:#f2f8fd;display:grid;grid-template-columns:150px 220px 120px 180px 1fr;gap:10px;align-items:end;
+  }
+  .sidebar h2{grid-column:1/-1;margin:0 0 -2px;font-size:15px;color:#0a3567}
+  .sidebar .nav-row{display:grid;grid-template-columns:42px 130px 42px;gap:5px;margin:0}
+  .sidebar .nav-row button{height:38px;border-color:#aac9df;background:#fff;color:#124f82;font-weight:700}
+  .sidebar label{margin:0;color:#1a466d;font-size:12px}
+  .sidebar input,.sidebar select{height:38px;margin-top:4px;border-color:#b8d1e3;background:#fff}
+  .sidebar #futureWeeks{height:38px;margin:0;align-self:end;color:#0d5c98;font-weight:700;border-color:#b6cee1;background:#fff}
+  .sidebar h3,.sidebar .week-list{display:none}
+
+  .content{padding:0;border:0;background:transparent}
+  .week-head{border:1px solid var(--screen-line);border-radius:10px;background:#f8fcff;padding:10px 12px;margin-bottom:10px;align-items:center}
+  .week-head>div:first-child{min-width:320px}
+  .week-head .eyebrow{display:none}
+  .week-head h2{font-size:20px;color:#112f61;margin:0;font-weight:800}
+  .head-actions{gap:8px;align-items:center}
+  .head-actions label{min-width:145px}
+  .head-actions select{height:40px;margin:0;border-color:#c5a53d;background:#fff9df}
+  .head-actions button{height:40px;padding:0 15px;border-radius:7px;font-weight:800;border-width:1px}
+  #saveWeekBtn{background:#0cac70;color:white;border-color:#08965f;padding-left:18px;padding-right:18px}
+  #saveWeekBtn::before{content:'✓';font-size:18px;margin-right:7px}
+  #printBtn{background:#edf7ff;border-color:#86bee8;color:#07599b}
+  #printBtn::before{content:'▣';margin-right:6px}
+  #pdfBtn{background:#edf7ff;border-color:#86bee8;color:#07599b}
+  #pdfBtn::before{content:'PDF';font-size:9px;border:1px solid currentColor;border-radius:2px;padding:1px 2px;margin-right:6px}
+  #emailBtn{background:#7445d4;border-color:#7445d4;color:#fff}
+  #emailBtn::before{content:'✉';font-size:17px;margin-right:6px}
+  #resetWeek{background:#fff;border-color:#d6e0e8;color:#627688;font-weight:600}
+  
+
+  .dashboard{grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin:0 0 10px}
+  .dash-card{min-height:84px;border:0;border-radius:10px;padding:12px 14px 10px 78px;position:relative;display:flex;flex-direction:column;justify-content:center;box-shadow:inset 0 0 0 1px #d6e6f0}
+  .dash-card small{font-size:12px;font-weight:700;color:#395f7b;order:2}
+  .dash-card b{font-size:27px;line-height:1;color:#0f4f88;margin:0 0 5px;order:1}
+  .dash-card span{font-size:12px;order:3;color:#45677f}
+  .dash-card::before{position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:37px;line-height:1}
+  .dash-card:nth-child(1){background:#e9f6ff}.dash-card:nth-child(1)::before{content:'👥'}
+  .dash-card:nth-child(2){background:#e7f9ec}.dash-card:nth-child(2)::before{content:'⌂';color:#12935d;font-weight:900}
+  .dash-card:nth-child(3){background:#f1ebff}.dash-card:nth-child(3)::before{content:'▣';color:#7540cf}
+  .dash-card:nth-child(4){background:#eef6fb}.dash-card:nth-child(4)::before{content:'▥';color:#79a3bf}
+  .dash-card:nth-child(5){background:#fff0f2}.dash-card:nth-child(5)::before{content:'⚠';color:#dc3d52}
+  .dash-card.good{background:#ecf9ef}.dash-card.alert{background:#fff0f2}.dash-card.warn{background:#fff8e4}
+
+  .safety-actions{display:grid;grid-template-columns:250px 270px 1fr;gap:12px;align-items:end;margin:0 0 8px}
+  #checkOrder{height:47px;background:#0874bd;border-color:#0874bd;font-size:15px;font-weight:800}
+  #checkOrder::before{content:'⌕';font-size:26px;vertical-align:-2px;margin-right:8px}
+  #absenceBtn{height:47px;background:#fff;border:1px solid #7eb6e1;color:#075b9e;font-size:15px;font-weight:800}
+  #absenceBtn::before{content:'●';margin-right:9px}
+  #unlockArchive{height:47px}
+
+  .sortbar{background:#fff;border:1px solid #d6e5ef;border-radius:9px;padding:8px 10px;margin:0 0 8px;gap:8px}
+  .sortbar strong{padding:0 8px 0 0;align-self:center;color:#1c496d}
+  .sortbar label{min-width:125px}.sortbar select{height:34px;margin:0}
+
+  .week-notes{grid-template-columns:1fr auto;margin:0 0 10px;background:#fff;border:1px solid #d5e5ef;border-radius:9px;padding:9px 11px;align-items:end}
+  .week-notes label{color:#193d61;font-size:12px}
+  .week-notes textarea{min-height:40px;height:40px;resize:vertical;margin-top:5px;padding:9px 11px}
+  .save-state{padding:0 4px 8px;color:#22804a;font-weight:700}
+
+  #editor{display:flex;flex-direction:column;gap:10px}
+  .editor-group{margin:0;border:1px solid #cbdfe9;border-radius:9px;background:#fff;box-shadow:0 1px 2px #244b6810}
+  .group-title{min-height:43px;padding:9px 16px 8px 48px;font-size:21px;align-items:center;position:relative}
+  .group-title::before{position:absolute;left:18px;font-size:23px;line-height:1}
+  .g-rdc .group-title::before{content:'🍴'}
+  .g-floor .group-title::before{content:'🍴'}
+  .g-pro .group-title{background:var(--pro);color:#35118c}.g-pro .group-title::before{content:'👥'}
+  .g-guest .group-title{background:linear-gradient(90deg,#ffc4df,#ffdbeb)}.g-guest .group-title::before{content:'👤'}
+  .group-title span:last-child{font-size:15px;color:inherit}
+
+  .editor-group table{table-layout:fixed;background:#fff}
+  .editor-group th,.editor-group td{border-color:#d4e2eb;padding:6px 8px}
+  .editor-group th{background:#edf5fa;color:#163c67;font-size:12px;height:32px;font-weight:800}
+  .editor-group th:nth-child(1){width:210px}.editor-group th:nth-child(2){width:140px}.editor-group th:nth-child(3){width:125px}
+  .editor-group th:nth-child(n+4):nth-child(-n+8){width:170px}
+  .editor-group th:nth-child(9){width:135px}
+  .editor-group .name{font-size:13px;color:#102d57;padding-left:31px;position:relative;white-space:normal}
+  .editor-group .name::before{content:'●';position:absolute;left:12px;color:#6d88a0;font-size:12px;top:50%;transform:translateY(-50%)}
+  .meta-cell{font-size:12px;white-space:normal}
+  .dot{width:11px;height:11px;margin-right:7px}
+  .day-cell{min-width:0;padding:5px 6px;background:#fff}
+  .order-line{gap:3px}.order-select{width:100%;min-width:0;height:31px;padding:3px 28px 3px 8px;border:1px solid #b9cfe0;border-radius:6px;background:#fff;color:#17324a;font-size:12px}
+  .propagate{width:25px;min-width:25px;padding:2px 3px;border:0;background:transparent;color:#7c94a8;font-size:13px}
+  /* Couleurs des types de repas : le repas sur place reprend exactement la couleur du lieu. */
+  .g-rdc .meal-repas-sur-place .order-select,.template-group-rdc.meal-repas-sur-place .order-select{background:var(--rdc);border-color:#7fcf93;color:#17324a}
+  .g-floor .meal-repas-sur-place .order-select,.template-group-floor.meal-repas-sur-place .order-select{background:var(--floor);border-color:#77bbea;color:#17324a}
+  .g-pro .meal-repas-sur-place .order-select,.template-group-pro.meal-repas-sur-place .order-select{background:var(--pro);border-color:#b79be0;color:#35118c}
+  .g-guest .meal-repas-sur-place .order-select,.template-group-guest.meal-repas-sur-place .order-select{background:var(--guest);border-color:#ef9fc4;color:#6e2047}
+  .meal-absent .order-select{background:#fff;border-color:#b9cfe0;color:#17324a}
+  .meal-plateau .order-select{background:var(--tray);border-color:#e7b166;color:#725100}
+  .meal-container .order-select{background:var(--container);border-color:#69cdb4;color:#155d52}
+  .meal-pique-nique .order-select{background:var(--picnic);border-color:#dfbf4e;color:#765500}
+  .closed-cell{background:#ffe5e5!important}
+  .extra-row{background:#fafcff;border:1px dashed #c9d9e4;border-radius:5px;padding:4px;gap:4px}
+  .note-input{height:31px;width:100%;min-width:0}
+  .editor-add{text-align:left;padding:3px 0 6px}.editor-add button{background:#fff;border-color:#94bdd9;color:#075b99;font-weight:800}
+
+  .audit-panel{background:#fff;border-color:#d4e4ee}.audit-panel summary{padding:9px 12px}
+  .closure-banner{border-radius:8px;background:#c92b39;margin-top:7px}
+
+  /* Écrans secondaires : même langage visuel, sans modifier la logique */
+  .panel-card{border-color:#d1e1eb;box-shadow:0 1px 3px #193d5b10}.panel-card h2{font-size:20px}
+  .model-page,.settings-grid .panel-card,#tab-historique .panel-card,#tab-aide .panel-card{background:#fff}
+
+  @media(max-width:1350px){
+    .topbar{padding:0 12px}.brand{min-width:205px}.app-title-block{min-width:260px}.app-title-block strong{font-size:26px}.tabs .tab{min-width:94px;font-size:11px}
+    .dashboard{grid-template-columns:repeat(3,1fr)}
+    .editor-group{overflow-x:auto}.editor-group table{min-width:1320px}
+  }
+  @media(max-width:950px){
+    .topbar{flex-wrap:wrap;height:auto;padding:8px}.tabs{width:100%;height:65px}.tab{height:65px;flex:1;min-width:0}.app-title-block{display:none}
+    .sidebar{grid-template-columns:1fr 1fr}.sidebar h2{grid-column:1/-1}.sidebar #futureWeeks{grid-column:1/-1}.dashboard{grid-template-columns:1fr 1fr}.safety-actions{grid-template-columns:1fr}.week-head{flex-direction:column;align-items:stretch}
   }
 }
 
-@media (max-width: 580px) {
-  #app { padding: 8px; }
-  .sheet { padding: 12px; }
-  .people-grid { grid-template-columns: repeat(3, 1fr); }
-  .person-photo { width: 72px; height: 72px; }
-}
+/* Interface consolidée */
+.day-cell.meal-absent{background:#fff!important}
+.meal-absent .order-select{background:#fff!important;color:#17324a!important;border-color:#b9cfe0!important}
+.order-select option{background:#fff;color:#17324a}
 
-@page {
-  size: A4 portrait;
-  margin: 8mm;
-}
+/* Interface consolidée */
+#dashboard,.dashboard{display:none!important}
+/* Menus de la semaine habituelle : lisibles et visibles sur fond blanc */
+#tab-modele .order-select{background:#fff!important;color:#17324a!important;border:1px solid #b9c9d7!important;border-radius:7px!important;padding:7px 28px 7px 9px!important;min-height:34px!important}
+#tab-modele .day-cell{background:#fff!important}
+#tab-modele .template-table td{background:#fff}
+/* Confirmation d’enregistrement */
 
-@media print {
-  html, body { background: #fff; }
-  .no-print, .status { display: none !important; }
-  #app { padding: 0; }
 
-  .sheet {
-    display: block !important;
-    max-width: none;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 0;
+/* Interface consolidée */
+.template-table tr.template-rdc td.sticky-group{background:var(--rdc);font-weight:700}
+.template-table tr.template-floor td.sticky-group{background:var(--floor);font-weight:700}
+.template-table tr.template-pro td.sticky-group{background:var(--pro);font-weight:700;color:#35118c}
+.template-table tr.template-guest td.sticky-group{background:var(--guest);font-weight:700}
+/* Les cellules restent blanches ; seule la sélection porte la couleur du type de repas. */
+.template-table .day-cell{background:#fff}
+
+
+/* Interface consolidée */
+#futureWeeks{min-width:260px;min-height:52px;padding:9px 16px!important;white-space:normal!important;line-height:1.2!important;display:flex;align-items:center;justify-content:center;text-align:center}
+/* Container : gris dans tous les menus de sélection à l'écran. */
+.meal-container .order-select,
+.g-rdc .meal-container .order-select,
+.g-floor .meal-container .order-select,
+.g-pro .meal-container .order-select,
+.g-guest .meal-container .order-select,
+.template-group-rdc.meal-container .order-select,
+.template-group-floor.meal-container .order-select,
+.template-group-pro.meal-container .order-select,
+.template-group-guest.meal-container .order-select{background:#eceff2!important;border-color:#aeb7c0!important;color:#374151!important}
+/* Semaine habituelle : les couleurs du type sélectionné restent visibles. */
+#tab-modele .meal-repas-sur-place.template-group-rdc .order-select{background:var(--rdc)!important;border-color:#7fcf93!important}
+#tab-modele .meal-repas-sur-place.template-group-floor .order-select{background:var(--floor)!important;border-color:#77bbea!important}
+#tab-modele .meal-repas-sur-place.template-group-pro .order-select{background:var(--pro)!important;border-color:#b79be0!important;color:#35118c!important}
+#tab-modele .meal-plateau .order-select{background:var(--tray)!important;border-color:#e7b166!important;color:#725100!important}
+#tab-modele .meal-container .order-select{background:#eceff2!important;border-color:#aeb7c0!important;color:#374151!important}
+#tab-modele .meal-pique-nique .order-select{background:var(--picnic)!important;border-color:#dfbf4e!important;color:#765500!important}
+#tab-modele .meal-absent .order-select{background:#fff!important;border-color:#b9cfe0!important;color:#17324a!important}
+.group-tools{display:flex!important;align-items:center;gap:14px;margin-left:auto;font-size:12px!important}
+.group-tools label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700}
+.group-tools select{height:29px;min-width:105px;margin:0;padding:2px 24px 2px 7px;border:1px solid #94b4c7;border-radius:6px;background:#fff;color:#17324a;font-size:11px}
+.group-tools b{font-size:13px}
+.list-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:0 0 12px;padding:10px 12px;background:#f3f8fc;border:1px solid #d3e3ee;border-radius:8px}
+.list-controls label{min-width:150px;font-size:12px;font-weight:700;color:#173b62}
+.list-controls select{margin-top:4px;height:36px;background:#fff}
+.template-controls{position:sticky;left:0;z-index:5;max-width:760px}
+
+/* Interface consolidée */
+.inline-profile-select{min-width:120px;margin:0;padding:5px 7px;background:#fff}.settings-table td .inline-profile-select{width:100%}
+
+/* Interface consolidée */
+.editable-profile{min-width:132px}
+.screen-profile-select{width:100%;min-width:120px;padding:6px 28px 6px 9px;border:1px solid #cbd8e8;border-radius:7px;background:#fff;color:#17345f;font-weight:600}
+.screen-profile-select:focus{outline:2px solid rgba(34,112,180,.18);border-color:#77a9d8}
+
+/* Interface consolidée */
+@media (min-width:1001px){
+  /* La zone de navigation dispose désormais de sa vraie largeur : plus de chevauchement avec Année. */
+  .sidebar{
+    grid-template-columns:235px 180px 220px minmax(250px,1fr);
+    column-gap:14px;
+  }
+  .sidebar .nav-row{
+    grid-template-columns:42px 141px 42px;
+    width:235px;
+  }
+  .sidebar #futureWeeks{
+    min-width:250px;
+    width:100%;
+    white-space:normal;
+    line-height:1.15;
   }
 
-  .sheet-head {
-    padding-bottom: 8px;
+  /* Statut et Enregistrer sont posés sur la même ligne et à la même hauteur. */
+  .head-actions{
+    display:grid;
+    grid-template-columns:160px auto auto auto auto auto auto;
+    align-items:end;
+    gap:8px;
   }
-
-  .sheet h2 { font-size: 21px; }
-
-  .logo-wrap {
-    width: 105px;
-    min-width: 105px;
-    height: 58px;
+  .head-actions label{
+    width:160px;
+    min-width:160px;
+    margin:0;
   }
-
-  .room-visual {
-    border-radius: 5px;
+  .head-actions label select,
+  .head-actions > button{
+    height:40px;
+    margin-bottom:0;
   }
-
-  .room-visual img {
-    width: 100%;
-    height: 72mm;
-    object-fit: cover;
-    object-position: center center;
-  }
-
-  .room-visual figcaption {
-    padding: 5px 8px;
-    font-size: 10px;
-  }
-
-  .people-heading {
-    margin-top: 12px;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-  }
-
-  .people-heading h3 { font-size: 15px; }
-
-  .people-grid {
-    grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
-  }
-
-  .person-card {
-    padding: 4px 3px 6px;
-    border-radius: 5px;
-  }
-
-  .person-photo {
-    width: 20mm;
-    height: 20mm;
-    border-radius: 4px;
-  }
-
-  .person-name { font-size: 9px; }
-
-  .sheet-foot { margin-top: 8px; }
-
-  body.print-a3 .room-visual img {
-    width: 100%;
-    height: 105mm;
-    object-fit: cover;
-    object-position: center center;
-  }
-
-  body.print-a3 .people-grid {
-    grid-template-columns: repeat(8, 1fr);
-    gap: 10px;
-  }
-
-  body.print-a3 .person-photo {
-    width: 27mm;
-    height: 27mm;
-  }
-
-  body.print-a3 .person-name {
-    font-size: 11px;
-  }
+  #saveWeekOk{align-self:end;min-height:40px;display:flex;align-items:center}
+  #saveWeekOk[hidden]{display:none}
 }
 
 
-/* Informations repas sous le portrait */
-.person-infos {
-  width: 100%;
-  display: grid;
-  gap: 4px;
-  justify-items: center;
+/* Interface consolidée */
+
+/* Les deux boutons de contrôle ont exactement la même hauteur et le même alignement. */
+.safety-actions{
+  align-items:stretch!important;
+}
+#checkOrder,
+#absenceBtn,
+#unlockArchive{
+  height:48px!important;
+  min-height:48px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  margin:0!important;
+  line-height:1!important;
+}
+#checkOrder::before,
+#absenceBtn::before{
+  line-height:1!important;
+  display:inline-flex;
+  align-items:center;
 }
 
-.person-info {
-  width: 100%;
-  text-align: center;
-  font-size: 10px;
-  line-height: 1.15;
-  font-weight: 700;
-  padding: 3px 5px;
-  border-radius: 5px;
+/* Explication sous le bouton des 8 semaines. */
+.future-weeks-help{
+  margin:5px 2px 0;
+  font-size:10.5px;
+  line-height:1.3;
+  color:#6a7e8f;
+  max-width:270px;
 }
 
-.person-info-regime {
-  background: #fff5d9;
-  color: #6b5314;
-  border: 1px solid #f1dfaa;
+/* Boutons de gestion intégrés aux bandeaux de groupe. */
+.group-add-btn{
+  height:30px!important;
+  min-height:30px!important;
+  padding:3px 9px!important;
+  border:1px solid rgba(23,59,98,.25)!important;
+  border-radius:6px!important;
+  background:rgba(255,255,255,.88)!important;
+  color:#173b62!important;
+  font-size:11px!important;
+  font-weight:800!important;
+  white-space:nowrap;
+}
+.group-add-btn:hover{background:#fff!important}
+.manage-cell{
+  width:125px;
+  white-space:nowrap;
+}
+.manage-cell .mini{
+  margin:1px 2px;
+}
+.empty-group{
+  padding:14px 16px;
+  color:#687f90;
+  font-size:12px;
+  background:#fff;
 }
 
-.person-info-aide {
-  background: #eaf4fb;
-  color: #215d82;
-  border: 1px solid #c8e1ef;
+/* La semaine habituelle reprend exactement la présentation des groupes de la commande. */
+#tab-modele .template-settings{
+  border:0!important;
+  overflow:visible!important;
+}
+#tab-modele .template-editor-group{
+  margin:0 0 12px;
+}
+#tab-modele .template-editor-group table{
+  table-layout:fixed;
+  width:100%;
+  min-width:1320px;
+  margin:0;
+}
+#tab-modele .template-editor-group th,
+#tab-modele .template-editor-group td{
+  border-color:#d4e2eb;
+  padding:6px 8px;
+}
+#tab-modele .template-editor-group th{
+  background:#edf5fa;
+  color:#163c67;
+  font-size:12px;
+  height:32px;
+  font-weight:800;
+}
+#tab-modele .template-editor-group th:nth-child(1){width:210px}
+#tab-modele .template-editor-group th:nth-child(2){width:140px}
+#tab-modele .template-editor-group th:nth-child(3){width:125px}
+#tab-modele .template-editor-group th:nth-child(n+4):nth-child(-n+8){width:170px}
+#tab-modele .template-editor-group th:nth-child(9){width:135px}
+#tab-modele .template-editor-group th:nth-child(10){width:125px}
+#tab-modele .template-editor-group .name{
+  font-size:13px;
+  color:#102d57;
+  padding-left:31px;
+  position:relative;
+  white-space:normal;
+}
+#tab-modele .template-editor-group .name::before{
+  content:'●';
+  position:absolute;
+  left:12px;
+  color:#6d88a0;
+  font-size:12px;
+  top:50%;
+  transform:translateY(-50%);
 }
 
-@media print {
-  /* A3 = paysage et une seule page */
-  body.print-a3 {
-    width: auto;
-    height: auto;
+/* Le menu "Absent" reste blanc et Container reste gris dans les deux écrans. */
+#tab-modele .meal-absent .order-select,
+#tab-commande .meal-absent .order-select{
+  background:#fff!important;
+  color:#17324a!important;
+  border-color:#b9cfe0!important;
+}
+#tab-modele .meal-container .order-select,
+#tab-commande .meal-container .order-select{
+  background:#eceff2!important;
+  border-color:#aeb7c0!important;
+  color:#374151!important;
+}
+
+@media(max-width:1350px){
+  #tab-modele .template-editor-group{overflow-x:auto}
+}
+
+/* =========================================================
+   V17 — Lisibilité des menus de repas
+   Objectif : afficher "Repas sur place" en entier à l'écran.
+   Les colonnes des jours sont volontairement un peu plus larges ;
+   si l'espace disponible est insuffisant, le tableau défile horizontalement
+   plutôt que de tronquer le libellé du menu déroulant.
+   ========================================================= */
+
+/* Commande de la semaine : largeur minimale confortable pour le menu + bouton ↪ */
+#tab-commande .editor-group th:nth-child(n+4):nth-child(-n+8){
+  width:195px;
+  min-width:195px;
+}
+#tab-commande .editor-group .day-cell{
+  width:195px;
+  min-width:195px;
+}
+#tab-commande .editor-group .order-line{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%;
+}
+#tab-commande .editor-group .order-select{
+  flex:1 1 auto;
+  width:auto;
+  min-width:155px;
+  max-width:none;
+  height:34px;
+  padding-left:10px;
+  padding-right:30px;
+  white-space:nowrap;
+  font-size:12px;
+}
+#tab-commande .editor-group .propagate{
+  flex:0 0 25px;
+  width:25px;
+  min-width:25px;
+}
+#tab-commande .editor-group table{
+  min-width:1460px;
+}
+
+/* Semaine habituelle : même lisibilité, sans bouton de propagation. */
+#tab-modele .template-editor-group th:nth-child(n+4):nth-child(-n+8){
+  width:180px;
+  min-width:180px;
+}
+#tab-modele .template-editor-group .day-cell{
+  width:180px;
+  min-width:180px;
+}
+#tab-modele .template-editor-group .order-select{
+  width:100%!important;
+  min-width:158px!important;
+  max-width:none!important;
+  height:34px!important;
+  padding-left:10px!important;
+  padding-right:30px!important;
+  white-space:nowrap!important;
+  font-size:12px!important;
+}
+#tab-modele .template-editor-group table{
+  min-width:1450px;
+}
+
+/* Évite que le navigateur compresse les colonnes au point de masquer le texte. */
+#tab-commande .editor-group,
+#tab-modele .template-editor-group{
+  overflow-x:auto;
+  overflow-y:visible;
+}
+
+@media(max-width:1350px){
+  #tab-commande .editor-group table{min-width:1460px}
+  #tab-modele .template-editor-group table{min-width:1450px}
+}
+
+/* =========================================================
+   V18 — 14/09/2026
+   - menus Régime / Texture plus larges et sans débordement
+   - libellés Hypocalorique / Hypolipidique entièrement visibles
+   - couleurs de fond selon la valeur sélectionnée
+   - bandeaux RDC / 1er étage / Professionnels sur toute la largeur du tableau
+   - suppression de la colonne Note cuisine des tableaux écran
+   ========================================================= */
+
+/* Colonnes Régime / Texture : assez larges pour tous les libellés. */
+#tab-commande .editor-group th:nth-child(2),
+#tab-modele .template-editor-group th:nth-child(2){
+  width:175px!important;
+  min-width:175px!important;
+}
+#tab-commande .editor-group th:nth-child(3),
+#tab-modele .template-editor-group th:nth-child(3){
+  width:175px!important;
+  min-width:175px!important;
+}
+#tab-commande .editor-group td:nth-child(2),
+#tab-commande .editor-group td:nth-child(3),
+#tab-modele .template-editor-group td:nth-child(2),
+#tab-modele .template-editor-group td:nth-child(3){
+  width:175px!important;
+  min-width:175px!important;
+  max-width:175px!important;
+}
+
+/* Les selects restent contenus dans leur cellule, sans déborder. */
+#tab-commande .screen-profile-select,
+#tab-modele .screen-profile-select,
+.settings-table .inline-profile-select{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  height:34px!important;
+  padding:5px 30px 5px 10px!important;
+  font-size:12px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+
+/* Couleurs de fond Régime / Texture suivant la valeur réellement sélectionnée. */
+.profile-normal{
+  background:#eceff2!important;
+  border-color:#c5ccd3!important;
+  color:#374151!important;
+}
+.profile-brown{
+  background:#ead4c2!important;
+  border-color:#bd8f6a!important;
+  color:#5c3c25!important;
+}
+.profile-purple{
+  background:#e4d7fb!important;
+  border-color:#a98ce8!important;
+  color:#563d8c!important;
+}
+.profile-yellow{
+  background:#fff3b8!important;
+  border-color:#e3ca61!important;
+  color:#6e5a0a!important;
+}
+.profile-green{
+  background:#d7f0db!important;
+  border-color:#79c78a!important;
+  color:#235c31!important;
+}
+.profile-red{
+  background:#f8d6d6!important;
+  border-color:#dc8d8d!important;
+  color:#8a2f2f!important;
+}
+
+/* Les options restent lisibles à l'ouverture du menu natif. */
+.screen-profile-select option,
+.inline-profile-select option{
+  background:#fff!important;
+  color:#17324a!important;
+}
+
+/* Les bandeaux de groupe suivent toute la largeur réelle du tableau. */
+#tab-commande .editor-group .group-title{
+  min-width:1500px!important;
+  width:max-content!important;
+  box-sizing:border-box!important;
+}
+#tab-modele .template-editor-group .group-title{
+  min-width:1490px!important;
+  width:max-content!important;
+  box-sizing:border-box!important;
+}
+
+/* Après suppression de Note cuisine, Gestion est la dernière colonne. */
+#tab-commande .editor-group th:last-child,
+#tab-modele .template-editor-group th:last-child{
+  width:135px!important;
+  min-width:135px!important;
+}
+
+/* Largeur globale recalculée avec les colonnes Régime/Texture élargies. */
+#tab-commande .editor-group table{
+  min-width:1500px!important;
+}
+#tab-modele .template-editor-group table{
+  min-width:1490px!important;
+}
+
+/* Le bandeau défile avec le tableau, sans s'arrêter avant la colonne Gestion. */
+#tab-commande .editor-group,
+#tab-modele .template-editor-group{
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+}
+
+
+/* Interface consolidée */
+
+/* Le bouton Outlook doit rester entièrement sur une seule ligne et centré verticalement. */
+#emailBtn{
+  min-width:220px!important;
+  width:auto!important;
+  white-space:nowrap!important;
+  line-height:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  align-self:end!important;
+  padding:0 18px!important;
+  overflow:visible!important;
+}
+
+/* Les actions principales utilisent une ligne souple sans écraser Outlook. */
+@media (min-width:1001px){
+  .head-actions{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    justify-content:flex-end!important;
+    align-items:flex-end!important;
+    gap:8px!important;
+  }
+  .head-actions label{
+    width:160px!important;
+    min-width:160px!important;
+    margin:0!important;
+  }
+  .head-actions label select,
+  .head-actions > button{
+    height:40px!important;
+    min-height:40px!important;
+    margin:0!important;
+  }
+  #saveWeekOk{
+    min-height:40px!important;
+    align-items:center!important;
+  }
+}
+
+/* Le panneau latéral n'a plus à réserver une colonne pour le bouton 8 semaines. */
+@media (min-width:1001px){
+  .sidebar{
+    grid-template-columns:235px 180px 220px!important;
+    column-gap:14px!important;
+  }
+}
+
+/* =====================================================================
+   V20 — 14/09/2026
+   Lisibilité Régime / Texture, couleurs des textures et bandeaux complets.
+   Ces règles concernent uniquement l'écran : le print existant reste intact.
+   ===================================================================== */
+@media screen {
+  /* 1) Séparer nettement le profil alimentaire (Régime/Texture) des jours. */
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(3){
+    background:#f3f6f8!important;
+  }
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(3){
+    background:#fbfcfd;
+  }
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(3){
+    border-right:3px solid #8faabd!important;
+  }
+  #tab-commande .editor-group th:nth-child(4),
+  #tab-modele .template-editor-group th:nth-child(4){
+    border-left:3px solid #8faabd!important;
   }
 
-  body.print-a3 .sheet {
-    width: 100%;
-    max-width: none;
-    height: 281mm;
-    max-height: 281mm;
-    overflow: hidden;
-    display: flex !important;
-    flex-direction: column;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    page-break-after: avoid;
+  /* Largeurs fixes : les menus ne débordent plus et les libellés restent complets. */
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(2){
+    width:185px!important;min-width:185px!important;max-width:185px!important;
+  }
+  #tab-commande .editor-group th:nth-child(3),
+  #tab-commande .editor-group td:nth-child(3),
+  #tab-modele .template-editor-group th:nth-child(3),
+  #tab-modele .template-editor-group td:nth-child(3){
+    width:175px!important;min-width:175px!important;max-width:175px!important;
+  }
+  #tab-commande .screen-profile-select,
+  #tab-modele .screen-profile-select,
+  .settings-table .inline-profile-select{
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
   }
 
-  body.print-a3 .sheet-head {
-    flex: 0 0 auto;
-    min-height: 22mm;
-    padding-bottom: 5mm;
+  /* 2) Couleurs de fond exactement selon le régime / la texture. */
+  .profile-normal{
+    background:#e6e9ed!important;
+    border-color:#b9c0c8!important;
+    color:#374151!important;
+  }
+  .profile-brown{
+    background:#d8b79f!important;
+    border-color:#a97855!important;
+    color:#55331f!important;
+  }
+  .profile-purple{
+    background:#d5c1f4!important;
+    border-color:#9471d6!important;
+    color:#4f337e!important;
+  }
+  .profile-yellow{
+    background:#fff0a8!important;
+    border-color:#dcc253!important;
+    color:#685607!important;
+  }
+  /* Purée lisse : volontairement plus foncé que le vert "Repas sur place" du RDC. */
+  .profile-green{
+    background:#7fd596!important;
+    border-color:#3da85b!important;
+    color:#143f22!important;
+    font-weight:700!important;
+  }
+  /* Haché lubrifié : fond rouge franc, texte sombre lisible. */
+  .profile-red{
+    background:#ef9a9a!important;
+    border-color:#cf5656!important;
+    color:#701f1f!important;
+    font-weight:700!important;
   }
 
-  body.print-a3 .room-visual {
-    flex: 0 0 auto;
+  /* 3) Les bandeaux RDC / 1er étage / Professionnels remplissent TOUTE la largeur visible. */
+  #tab-commande .editor-group,
+  #tab-modele .template-editor-group{
+    position:relative;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+  }
+  #tab-commande .editor-group .group-title,
+  #tab-modele .template-editor-group .group-title{
+    width:100%!important;
+    min-width:100%!important;
+    max-width:none!important;
+    box-sizing:border-box!important;
+    margin:0!important;
+    border-radius:0!important;
+  }
+  /* Quand le tableau est plus large que la fenêtre, le bandeau garde aussi la largeur utile du tableau. */
+  #tab-commande .editor-group table,
+  #tab-modele .template-editor-group table{
+    min-width:1510px!important;
+  }
+  @supports (width:max(100%,1510px)) {
+    #tab-commande .editor-group .group-title,
+    #tab-modele .template-editor-group .group-title{
+      width:max(100%,1510px)!important;
+    }
   }
 
-  body.print-a3 .room-visual img {
-    width: 100%;
-    height: 88mm;
-    object-fit: cover;
-    object-position: center center;
+  /* 4) La colonne Note cuisine ne doit jamais réapparaître dans les tableaux écran. */
+  #tab-commande th.note-col,
+  #tab-commande td.note-col,
+  #tab-modele th.note-col,
+  #tab-modele td.note-col,
+  #tab-commande .note-input,
+  #tab-modele .note-input{
+    display:none!important;
+  }
+}
+
+
+/* V27 — règles finales de lisibilité */
+@media screen {
+  /* Séparation verticale franche entre identité et profil alimentaire. */
+  #tab-commande .editor-group th:first-child,
+  #tab-commande .editor-group td:first-child,
+  #tab-modele .template-editor-group th:first-child,
+  #tab-modele .template-editor-group td:first-child{
+    border-right:4px solid #8faabd!important;
+  }
+  #tab-commande .editor-group th:nth-child(2),
+  #tab-commande .editor-group td:nth-child(2),
+  #tab-modele .template-editor-group th:nth-child(2),
+  #tab-modele .template-editor-group td:nth-child(2){
+    border-left:4px solid #8faabd!important;
   }
 
-  body.print-a3 .people-heading {
-    flex: 0 0 auto;
-    margin: 5mm 0 3mm;
+  /* Les couleurs doivent rester visibles sur les SELECT, y compris après changement. */
+  select.profile-green,
+  #tab-commande select.profile-green,
+  #tab-modele select.profile-green,
+  .settings-table select.profile-green{
+    background:#63c77f!important;
+    border:2px solid #2f934a!important;
+    color:#103b1d!important;
+    font-weight:400!important;
+  }
+  select.profile-red,
+  #tab-commande select.profile-red,
+  #tab-modele select.profile-red,
+  .settings-table select.profile-red{
+    background:#ef7f7f!important;
+    border:2px solid #c93e3e!important;
+    color:#651717!important;
+    font-weight:400!important;
+  }
+}
+
+
+
+/* V29 — lecture du récapitulatif et détail portrait sur une seule page */
+.page-summary .meal-count-nonzero{font-weight:800;color:#0b2f62}
+.page-detail .detail-person-table{table-layout:auto}
+.page-detail .detail-person-table td,.page-detail .detail-person-table th{white-space:nowrap}
+.page-detail .detail-person-table .name{max-width:25mm}
+.page-detail #detailScale{transform-origin:top left}
+
+
+/* V30 — impression détail : lisibilité maximale en A4 portrait sur une seule page. */
+.page-detail #detailScale{width:100%;overflow:visible}
+.page-detail #detailScale table{width:100%;border:1px solid #9fb0bd;border-collapse:collapse}
+.page-detail #detailScale th,.page-detail #detailScale td{border:1px solid #9fb0bd}
+.page-detail #detailScale table tr > *:last-child{border-right:1px solid #7f94a3!important}
+.page-detail #detailScale table tr:last-child > *{border-bottom:1px solid #7f94a3!important}
+.page-detail #detailScale .detail-person-table{table-layout:fixed;width:100%}
+.page-detail #detailScale .detail-person-table th,.page-detail #detailScale .detail-person-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media print{
+  .page-detail #detailScale{width:100%!important;max-height:none;overflow:visible}
+  .page-detail #detailScale table{width:100%!important;border:1px solid #7f94a3!important}
+  .page-detail #detailScale table tr > *:last-child{border-right:1px solid #7f94a3!important}
+}
+
+/* V31 — profil alimentaire combiné au récapitulatif : un repas = un seul comptage. */
+.profile-plus{font-weight:700;padding:0 .6mm;color:#46515a}
+
+
+/* V32 — message explicite en cas d’échec d’initialisation */
+.fatal-init-error{margin:12px 0;padding:12px 14px;border:2px solid #b91c1c;border-radius:8px;background:#fff1f1;color:#7f1d1d;font-size:13px;line-height:1.4}.fatal-init-error strong{font-size:14px}
+
+/* V34 — le bouton d'édition d'archive doit rester réellement invisible quand hidden est présent. */
+#unlockArchive[hidden]{display:none!important;}
+
+
+/* V37 — aucun écrêtage vertical de la page détail : la réduction est calculée par JS. */
+.page-detail #detailScale{max-height:none!important;overflow:visible!important}
+#pdfCaptureHost .page-detail #detailScale{max-height:none!important;overflow:visible!important}
+@media print{.page-detail #detailScale{max-height:none!important;overflow:visible!important}}
+
+/* V40 — indicateur de version et diagnostics discrets */
+.version-badge{
+  flex:0 0 auto;
+  align-self:center;
+  padding:3px 7px;
+  border:1px solid #c9d5e1;
+  border-radius:999px;
+  background:#f5f8fb;
+  color:#5a6e80;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.04em;
+  white-space:nowrap;
+}
+.fatal-init-error{
+  margin:10px 0;
+  padding:12px 14px;
+  border:1px solid #d8a6a6;
+  border-left:4px solid #b43a3a;
+  border-radius:8px;
+  background:#fff6f6;
+  color:#7a1f1f;
+  line-height:1.4;
+}
+
+/* ======================================================================
+   V46 — interface écran Simplifiée / Avancée
+   IMPORTANT : toutes les règles ajoutées ci-dessous sont limitées à screen.
+   Les règles d'impression historiques placées plus haut restent intactes.
+   ====================================================================== */
+@media screen {
+  :root{
+    --v46-navy:#0b2f62;
+    --v46-blue:#1d5d93;
+    --v46-green:#2f8c64;
+    --v46-orange:#e89237;
+    --v46-border:#d5e0e8;
+    --v46-soft:#f5f8fa;
+    --v46-text:#17324a;
   }
 
-  body.print-a3 .people-grid {
-    flex: 1 1 auto;
-    min-height: 0;
-    align-content: start;
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    gap: 3mm;
-    overflow: hidden;
+  [hidden]{display:none!important}
+  body{background:#f4f7f9;color:var(--v46-text)}
+  button,input,select,textarea{min-height:40px}
+  input[type="checkbox"],input[type="radio"]{min-height:auto}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{
+    outline:3px solid #2b78c5!important;outline-offset:2px!important;
   }
 
-  body.print-a3 .person-card {
-    min-height: 0;
-    padding: 2.2mm 1.5mm 2mm;
-    gap: 1.2mm;
-    break-inside: avoid;
-    page-break-inside: avoid;
+  .accessible-topbar{
+    min-height:70px;padding:8px 16px;gap:10px 14px;align-items:center;justify-content:flex-start;
+    box-shadow:0 1px 7px #16324a12;
   }
+  .accessible-brand{display:flex;align-items:center;gap:9px;min-width:220px}
+  .accessible-brand .anagallis-fixed{
+    width:44px;height:44px;flex:0 0 44px;object-fit:cover;object-position:center;border-radius:10px;border:1px solid #d6e1e8;
+  }
+  .accessible-brand h1{font-size:19px;line-height:1.05;margin:0;color:var(--v46-navy);font-weight:500}
+  .accessible-brand h1 strong{font-weight:800}
+  .accessible-brand .brand-small{font-size:11px;margin-top:4px;letter-spacing:0;text-transform:none;color:#5d7180}
+  .odyneo-fixed{width:100px;height:44px;object-fit:contain;object-position:center;flex:0 0 100px;margin-left:auto}
+  .screen-logo{display:none!important}
 
-  body.print-a3 .person-photo {
-    width: 24mm;
-    height: 24mm;
-  }
+  .mode-switch{display:flex;gap:4px;padding:3px;background:#edf3f7;border:1px solid #d4e0e8;border-radius:10px}
+  .mode-btn{min-height:34px;padding:6px 11px;border:0;background:transparent;font-size:12px;font-weight:700;color:#516777}
+  .mode-btn.active{background:#fff;color:var(--v46-navy);box-shadow:0 1px 4px #17324a20}
+  .context-help{min-width:72px;min-height:38px;padding:6px 10px;border-color:#cbd9e3;font-weight:700;color:var(--v46-navy);white-space:nowrap}
+  .version-badge{font-size:9px;padding:2px 6px}
 
-  body.print-a3 .person-name {
-    font-size: 10.5px;
+  .accessible-topbar .tabs{
+    order:20;flex:1 0 100%;width:100%;height:auto;margin:0;padding-top:6px;border-top:1px solid #e4ebf0;
+    justify-content:center;gap:4px;
   }
+  .accessible-topbar .tab{min-height:38px;height:auto;padding:7px 13px;font-size:12px}
+  .tab-ico{margin-right:4px}
 
-  body.print-a3 .person-info {
-    font-size: 8.2px;
-    padding: 1.2mm 1mm;
-    line-height: 1.08;
-  }
+  .app{max-width:1560px;margin:12px auto 24px;padding:0 14px}
+  .simple-mode-panel{background:#fff;border:1px solid var(--v46-border);border-radius:13px;box-shadow:0 4px 16px #17324a0d;padding:14px}
+  .simple-weekbar{display:grid;grid-template-columns:42px minmax(260px,1fr) 42px;align-items:center;gap:10px;max-width:760px;margin:0 auto 8px}
+  .simple-weekbar button{width:42px;height:42px;padding:0;font-size:27px;line-height:1;color:var(--v46-navy)}
+  .simple-weekbar h2{margin:0;text-align:center;color:var(--v46-navy);font-size:21px;line-height:1.15}
+  .simple-context-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:4px 0 10px;min-height:0}
+  .simple-info-banner{font-size:11.5px;line-height:1.45;color:#5c5b38;background:#fffaf0;border:1px solid #eadfb8;border-radius:8px;padding:6px 9px;display:flex;flex-wrap:wrap;gap:4px 7px;align-items:center}
+  .simple-info-banner em{font-weight:400;color:#767154}
+  .simple-info-banner .info-sep{opacity:.55}
 
-  body.print-a3 .sheet-foot {
-    flex: 0 0 auto;
-    margin-top: 2.5mm;
-    padding-top: 1.5mm;
-  }
+  .weather-strip{margin-left:auto;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:5px;max-width:55%;font-size:10.5px;color:#4f6879;text-align:right}
+  .weather-chip{display:inline-block;padding:4px 7px;background:#f4f8fa;border:1px solid #dbe6ec;border-radius:999px;white-space:nowrap}
+  #advancedWeatherStrip{margin:6px 0 3px auto;max-width:100%}
 
-  /* Si le nombre de personnes augmente, on compacte automatiquement
-     tout en gardant la feuille A3 sur UNE SEULE PAGE. */
-  body.print-a3.many-people .room-visual img {
-    height: 78mm;
-  }
+  .simple-table-wrap{overflow-x:auto;overscroll-behavior-inline:contain;border:1px solid #d7e2e9;border-radius:10px}
+  .simple-table{min-width:1040px;table-layout:fixed;background:#fff}
+  .simple-table th{height:44px;background:#edf4f8;color:#31516a;font-size:12px}
+  .simple-table th:first-child{width:195px;text-align:left;padding-left:12px}
+  .simple-table th:not(:first-child){width:169px}
+  .simple-table th span{display:block;margin-top:2px;font-size:10px;font-weight:500;color:#7a8b96}
+  .simple-table td{padding:8px 7px;vertical-align:middle}
+  .simple-table td.simple-person{text-align:left;background:#fafcfd;border-right:2px solid #c7d6df}
+  .simple-person-card{display:flex;align-items:center;gap:8px;min-width:0}
+  .simple-avatar{width:38px;height:38px;flex:0 0 38px;border-radius:8px;overflow:hidden;background:#e8eef2;border:1px solid #d2dde4;display:grid;place-items:center;color:#607584;font-weight:800;font-size:12px}
+  .simple-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .simple-person-name{min-width:0;display:flex;flex-direction:column;line-height:1.15}
+  .simple-person-name b{font-size:12px;white-space:normal}
+  .simple-person-name small{margin-top:3px;color:#7b8b96;font-size:9.5px;font-weight:500}
+  .simple-day-cell{min-width:160px;background:#fff}
+  .simple-order-select{width:100%;min-height:39px;margin:0;padding:7px 25px 7px 8px;font-size:12px;font-weight:700}
+  .simple-time-label{display:block;margin-top:6px;font-size:10px;font-weight:700;color:#546b7c;text-align:left}
+  .simple-time-select{min-height:35px;margin-top:3px;padding:5px 22px 5px 7px;font-size:11px}
+  .simple-closed{background:#fff0f0!important;color:#851f1f}
+  .closed-choice{font-size:12px;font-weight:800}
+  .simple-closed small,.advanced-closed-day small{display:block;margin-top:3px;font-size:9.5px;font-weight:600;color:#a34a4a}
+  .advanced-closed-day{padding:5px;text-align:center;color:#851f1f}
 
-  body.print-a3.many-people .people-grid {
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    gap: 2.2mm;
-  }
+  .simple-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+  .simple-save-state{font-size:12px;font-weight:700}
+  .simple-save-state.saved{color:#2f7c56}
+  .simple-save-state.dirty{color:#b26116}
+  .simple-actions{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+  .simple-actions button{min-width:105px}
+  .simple-tip{margin-top:11px;padding:8px 10px;border-radius:8px;background:#fff9e8;border:1px solid #eadcad;color:#615838;font-size:11px;line-height:1.4}
+  .simple-tip strong{font-weight:700}
 
-  body.print-a3.many-people .person-photo {
-    width: 21mm;
-    height: 21mm;
-  }
+  /* L'interface avancée reste la V44 : uniquement quelques garde-fous d'accessibilité. */
+  .advanced-ui .tab-panel.active{display:block}
+  .advanced-ui .workspace{min-width:0}
+  .advanced-ui #editor,.advanced-ui #templateSettings{overflow-x:auto}
+  .advanced-ui .editor-group table,.advanced-ui .template-editor-group table{min-width:1200px}
+  .propagate{min-width:38px;min-height:38px;padding:5px}
 
-  body.print-a3.many-people .person-name {
-    font-size: 9px;
-  }
+  .settings-table-wrap{overflow-x:auto}
+  .settings-table{min-width:900px}
+  .holiday-exception-list{display:grid;gap:5px}
+  .holiday-exception-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0;padding:9px 10px;border:1px solid #dbe5eb;border-radius:8px;background:#fafcfd;color:var(--v46-text)}
+  .holiday-exception-row span:first-child{display:flex;flex-direction:column;gap:2px}
+  .holiday-exception-row small{font-weight:500;color:#70818d}
+  .holiday-open-control{display:flex!important;align-items:center;gap:6px;white-space:nowrap;font-size:11px}
+  .holiday-open-control input{width:auto;height:auto;min-height:0;margin:0}
+  .calendar-status{padding:9px 10px;border-radius:8px;background:#f4f8fa;border:1px solid #dbe5eb;color:#526a7a;font-size:11px;line-height:1.5}
+  .calendar-status code{font-size:10px;background:#e8eff4;padding:1px 4px;border-radius:4px}
 
-  body.print-a3.many-people .person-info {
-    font-size: 7.4px;
-  }
+  .context-help-dialog{max-width:610px}
+  .help-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .help-dialog-head h3{margin:0}
+  .dialog-close-x{width:38px;height:38px;min-height:38px;border:0;background:transparent;font-size:25px;line-height:1;padding:0;color:#526a7a}
+  .context-help-content{font-size:13px;line-height:1.5;color:#334f64}
+  .context-help-content ol{padding-left:21px}
+  .context-help-content li{margin:6px 0}
+  .help-tip{padding:8px 10px;border-radius:7px;background:#f4f8fa}
 
-  body.print-a3.very-many-people .room-visual img {
-    height: 68mm;
-  }
+  .validation-errors{padding-left:20px}
+  .validation-errors li{margin:5px 0}
+  .validation-focus{min-height:0;padding:2px 0;border:0;background:transparent;text-align:left;color:#8a2727;text-decoration:underline;text-decoration-thickness:1px}
+  .validation-focus:hover{background:transparent;color:#5f1717}
 
-  body.print-a3.very-many-people .people-grid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 1.8mm;
-  }
+  .toast{max-width:min(420px,calc(100vw - 30px))}
+}
 
-  body.print-a3.very-many-people .person-photo {
-    width: 18mm;
-    height: 18mm;
-  }
+@media screen and (max-width:760px){
+  .accessible-topbar{padding:7px 9px;gap:7px;flex-wrap:wrap}
+  .accessible-brand{min-width:175px}
+  .accessible-brand .anagallis-fixed{width:38px;height:38px;flex-basis:38px}
+  .accessible-brand h1{font-size:17px}
+  .accessible-brand .brand-small{font-size:9.5px}
+  .odyneo-fixed{width:76px;height:36px;flex-basis:76px}
+  .mode-switch{order:15;width:100%;justify-content:center}
+  .mode-btn{flex:1}
+  .context-help span{display:none}.context-help{min-width:40px;width:40px;padding:5px}
+  .version-badge{display:none}
+  .app{padding:0 7px;margin-top:8px}
+  .simple-mode-panel{padding:9px}
+  .simple-weekbar{grid-template-columns:40px 1fr 40px;gap:5px}
+  .simple-weekbar h2{font-size:16px}
+  .simple-context-row{display:block}.weather-strip{max-width:100%;margin-top:5px}
+  .simple-footer{align-items:flex-start;flex-direction:column}.simple-actions{width:100%}.simple-actions button{flex:1;min-width:90px}
+  .simple-tip{font-size:10.5px}
+  .panel-title{align-items:flex-start;flex-direction:column}
+}
 
-  body.print-a3.very-many-people .person-name {
-    font-size: 8px;
-  }
-
-  body.print-a3.very-many-people .person-info {
-    font-size: 6.8px;
-  }
+/* V46.1 — affichage uniquement de la date/heure de dernière sauvegarde sous Enregistrer. */
+@media screen {
+  .save-button-stack{display:flex;flex-direction:column;align-items:stretch;gap:3px}
+  .last-saved-time{font-size:9.5px;line-height:1.2;color:#6f7f8a;text-align:center;white-space:nowrap;font-weight:500}
 }
