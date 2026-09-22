@@ -100,7 +100,7 @@ const REQUIRED_SCHEMA={
 
 
 let weekStart=addDays(mondayOf(new Date()),7);
-let sourceUsers=[],sourcePros=[],config=[],templateRows=[],weeks=[],commands=[],guests=[],closures=[],settings=[],audit=[];
+let sourceUsers=[],sourcePros=[],sourceProPortraits=[],config=[],templateRows=[],weeks=[],commands=[],guests=[],closures=[],settings=[],audit=[];
 let repartitions=[],rooms=[];
 let saveTimer=null;
 let lastVisibleOrderSnapshot=[];
@@ -117,7 +117,7 @@ let uiMode='simple';
 let currentAdvancedTab='commande';
 let simpleDirty=false;
 let simpleDirtyIds=new Set();
-let portraitUrlByUserId=new Map();
+let portraitUrlByUserId=new Map(),portraitUrlByProId=new Map(),portraitUrlByProName=new Map();
 let portraitTokenInfo=null;
 let weatherByDate=new Map();
 let weatherAbortController=null;
@@ -285,10 +285,10 @@ async function migrateDateAndYearData(){
 }
 
 async function loadAll(){
-  const [u,p,c,t,w,cmd,g,cl,s,r,ro,j]=await Promise.all([
-    fetchSafe('Usagers'),fetchSafeFirst(['Professionnels','Animateurs']),fetchSafe(TABLES.config),fetchSafe(TABLES.template),fetchSafe(TABLES.weeks),fetchSafe(TABLES.cmd),fetchSafe(TABLES.guests),fetchSafe(TABLES.closures),fetchSafe(TABLES.settings),fetchSafe('Repartitions'),fetchSafe('Salles'),fetchSafe(TABLES.audit)
+  const [u,p,pa,c,t,w,cmd,g,cl,s,r,ro,j]=await Promise.all([
+    fetchSafe('Usagers'),fetchSafeFirst(['Professionnels','Animateurs']),fetchSafe('Animateurs'),fetchSafe(TABLES.config),fetchSafe(TABLES.template),fetchSafe(TABLES.weeks),fetchSafe(TABLES.cmd),fetchSafe(TABLES.guests),fetchSafe(TABLES.closures),fetchSafe(TABLES.settings),fetchSafe('Repartitions'),fetchSafe('Salles'),fetchSafe(TABLES.audit)
   ]);
-  sourceUsers=toRecords(u);sourcePros=toRecords(p);config=toRecords(c);templateRows=toRecords(t);weeks=toRecords(w);commands=toRecords(cmd);guests=toRecords(g);closures=toRecords(cl);settings=toRecords(s);repartitions=toRecords(r);rooms=toRecords(ro);audit=toRecords(j);
+  sourceUsers=toRecords(u);sourcePros=toRecords(p);sourceProPortraits=toRecords(pa);config=toRecords(c);templateRows=toRecords(t);weeks=toRecords(w);commands=toRecords(cmd);guests=toRecords(g);closures=toRecords(cl);settings=toRecords(s);repartitions=toRecords(r);rooms=toRecords(ro);audit=toRecords(j);
 }
 async function fetchSafe(name){try{return await grist.docApi.fetchTable(name)}catch(e){return null}}
 async function fetchSafeFirst(names){for(const name of names){const t=await fetchSafe(name);if(t)return t}return null}
@@ -447,9 +447,16 @@ function renderWeekNavigation(){
 function simpleTypeLabel(type){return ({'Repas sur place':'🍴 Sur place','Container':'📦 Container','Plateau':'🍱 Plateau','Pique-nique':'🧺 Pique-nique','Absent':'🚫 Absent'})[type]||type}
 function personSourceId(person){const cfg=configForPerson(person?.PersonKey);return +(cfg?.SourceId||person?.SourceId||0)}
 function initialsFor(person){const a=String(person?.Prenom||'').trim().charAt(0),b=String(person?.Nom||'').trim().charAt(0);return (a+b||'?').toUpperCase()}
+function portraitNameKey(person){return norm(`${person?.Prenom||''} ${person?.Nom||''}`).replace(/\s+/g,' ').trim()}
+function portraitUrlForPerson(person){
+  const cfg=configForPerson(person?.PersonKey),sourceId=personSourceId(person),sourceType=String(cfg?.SourceType||person?.SourceType||'');
+  const isPro=sourceType==='Professionnel'||String(person?.PersonKey||'').startsWith('P:')||person?.Groupe==='Professionnel';
+  if(isPro)return (sourceId?portraitUrlByProId.get(sourceId):'')||portraitUrlByProName.get(portraitNameKey(person))||'';
+  return sourceId?portraitUrlByUserId.get(sourceId)||'':'';
+}
 function simplePersonIdentity(person){
-  const sourceId=personSourceId(person),url=sourceId?portraitUrlByUserId.get(sourceId):'';const initials=initialsFor(person);
-  const avatar=url?`<img class="simple-avatar-img" src="${esc(url)}" alt="Portrait de ${esc((person.Prenom||'')+' '+(person.Nom||''))}"><span class="simple-avatar-fallback" hidden aria-hidden="true">${esc(initials)}</span>`:`<span class="simple-avatar-fallback" aria-hidden="true">${esc(initials)}</span>`;
+  const url=portraitUrlForPerson(person),initials=initialsFor(person);
+  const avatar=url?`<img class="simple-avatar-img" src="${esc(url)}" alt="Portrait de ${esc((person.Prenom||'')+' '+(person.Nom||''))}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="simple-avatar-fallback" hidden aria-hidden="true">${esc(initials)}</span>`:`<span class="simple-avatar-fallback" aria-hidden="true">${esc(initials)}</span>`;
   return `<div class="simple-person-card"><span class="simple-avatar">${avatar}</span><span class="simple-person-name"><b>${esc(person.Prenom||'')} ${esc(person.Nom||'')}</b><small>${esc(statusForPerson(person))}</small></span></div>`;
 }
 function businessClosureForCommand(row){return row?businessClosureFor(commandDate(row)):null}
@@ -566,8 +573,13 @@ async function refreshPortraitUrls(){
   try{
     if(!grist.docApi.getAccessToken)return;
     portraitTokenInfo=await grist.docApi.getAccessToken({readOnly:true});if(!portraitTokenInfo?.baseUrl||!portraitTokenInfo?.token)return;
-    const map=new Map();for(const u of sourceUsers){const id=attachmentIds(u.Portrait)[0];if(id)map.set(+u.id,`${portraitTokenInfo.baseUrl}/attachments/${id}/download?auth=${encodeURIComponent(portraitTokenInfo.token)}`)}portraitUrlByUserId=map;if(uiMode==='simple')renderSimpleMode();
-  }catch(err){console.warn('Portraits Grist indisponibles',err);portraitUrlByUserId=new Map()}
+    const attachmentUrl=id=>`${portraitTokenInfo.baseUrl}/attachments/${id}/download?auth=${encodeURIComponent(portraitTokenInfo.token)}`;
+    const userMap=new Map();
+    for(const u of sourceUsers){const id=attachmentIds(u.Portrait)[0];if(id)userMap.set(+u.id,attachmentUrl(id))}
+    const proIdMap=new Map(),proNameMap=new Map(),proRows=sourceProPortraits.length?sourceProPortraits:sourcePros;
+    for(const p of proRows){const id=attachmentIds(p.Portrait)[0];if(!id)continue;const url=attachmentUrl(id);proIdMap.set(+p.id,url);const key=portraitNameKey(p);if(key)proNameMap.set(key,url)}
+    portraitUrlByUserId=userMap;portraitUrlByProId=proIdMap;portraitUrlByProName=proNameMap;if(uiMode==='simple')renderSimpleMode();
+  }catch(err){console.warn('Portraits Grist indisponibles',err);portraitUrlByUserId=new Map();portraitUrlByProId=new Map();portraitUrlByProName=new Map()}
 }
 function weatherCodeText(code){
   const c=+code;if(c===0)return['☀️','Dégagé'];if([1,2].includes(c))return['🌤️','Éclaircies'];if(c===3)return['☁️','Couvert'];if([45,48].includes(c))return['🌫️','Brouillard'];if([51,53,55,56,57].includes(c))return['🌦️','Bruine'];if([61,63,65,66,67,80,81,82].includes(c))return['🌧️','Pluie'];if([71,73,75,77,85,86].includes(c))return['🌨️','Neige'];if([95,96,99].includes(c))return['⛈️','Orage'];return['🌡️','Prévision'];
