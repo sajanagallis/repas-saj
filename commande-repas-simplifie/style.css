@@ -1,4 +1,4 @@
-root{
+:root{
   --navy:#0b2f62;--text:#17324a;--muted:#6b7b88;--line:#cbd9e3;--soft:#f4f7fa;--white:#fff;
   --rdc:#b8efc5;--floor:#addcff;--pro:#dcc4ff;--guest:#ffc5df;--tray:#ffd2a3;--container:#a9f2df;--picnic:#ffe79e;
   --hypo:#8b5cf6;--hypolipid:#ffffff;--pork:#9a6848;--meat:#9a6848;--puree:#49b96f;--hache:#df3d3d;
@@ -1081,4 +1081,27 @@ root{
 @media screen {
   .save-button-stack{display:flex;flex-direction:column;align-items:stretch;gap:3px}
   .last-saved-time{font-size:9.5px;line-height:1.2;color:#6f7f8a;text-align:center;white-space:nowrap;font-weight:500}
+}
+
+
+/* V46.2 — Mode simplifié regroupé comme le widget historique.
+   ÉCRAN UNIQUEMENT : aucune règle d'impression/PDF n'est modifiée. */
+@media screen {
+  .simple-group{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:10px 0 13px;background:#fff}
+  .simple-group-title{padding:8px 12px;font-size:15px;font-weight:800;color:#0f2d57;letter-spacing:.01em}
+  .simple-group.g-rdc .simple-group-title{background:var(--rdc)}
+  .simple-group.g-floor .simple-group-title{background:var(--floor)}
+  .simple-group.g-pro .simple-group-title{background:var(--pro)}
+  .simple-group.g-guest .simple-group-title{background:var(--guest)}
+  .simple-group .simple-table-wrap{border:0;border-radius:0}
+
+  /* Couleurs strictement alignées sur les sélections de l'ancien widget. */
+  .simple-day-cell.simple-rdc.meal-repas-sur-place .simple-order-select{background:var(--rdc);border-color:#7fcf93;color:#17324a}
+  .simple-day-cell.simple-floor.meal-repas-sur-place .simple-order-select{background:var(--floor);border-color:#77bbea;color:#17324a}
+  .simple-day-cell.simple-pro.meal-repas-sur-place .simple-order-select{background:var(--pro);border-color:#b79be0;color:#35118c}
+  .simple-day-cell.simple-guest.meal-repas-sur-place .simple-order-select{background:var(--guest);border-color:#ef9fc4;color:#6e2047}
+  .simple-day-cell.meal-absent .simple-order-select{background:#fff;border-color:#b9cfe0;color:#17324a}
+  .simple-day-cell.meal-plateau .simple-order-select{background:var(--tray);border-color:#e7b166;color:#725100}
+  .simple-day-cell.meal-container .simple-order-select{background:#eceff2;border-color:#aeb7c0;color:#374151}
+  .simple-day-cell.meal-pique-nique .simple-order-select{background:var(--picnic);border-color:#dfbf4e;color:#765500}
 }

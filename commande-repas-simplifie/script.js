@@ -6,7 +6,7 @@
 */
 'use strict';
 
-const APP_VERSION='V46';
+const APP_VERSION='V46.2';
 const DAYS=[
   {key:'Lu',short:'Lun',label:'Lundi',offset:0},{key:'Ma',short:'Mar',label:'Mardi',offset:1},{key:'Me',short:'Mer',label:'Mercredi',offset:2},{key:'Je',short:'Jeu',label:'Jeudi',offset:3},{key:'Ve',short:'Ven',label:'Vendredi',offset:4}
 ];
@@ -453,14 +453,15 @@ function simplePersonIdentity(person){
   return `<div class="simple-person-card"><span class="simple-avatar">${avatar}</span><span class="simple-person-name"><b>${esc(person.Prenom||'')} ${esc(person.Nom||'')}</b><small>${esc(statusForPerson(person))}</small></span></div>`;
 }
 function businessClosureForCommand(row){return row?businessClosureFor(commandDate(row)):null}
-function simpleCell(c,archived=false){
+function simpleCell(c,archived=false,group=''){
   if(!c)return'<td class="simple-day-cell">—</td>';
   const closed=businessClosureForCommand(c);if(closed)return `<td class="simple-day-cell simple-closed"><div class="closed-choice">🚫 Absent</div><small>${esc(closed.reason)}</small></td>`;
   const disabled=archived?'disabled aria-disabled="true"':'';
   const options=TYPES.map(t=>`<option value="${esc(t)}" ${c.TypeCommande===t?'selected':''}>${simpleTypeLabel(t)}</option>`).join('');
   const needsTime=['Pique-nique','Container','Plateau'].includes(c.TypeCommande);
   const time=needsTime?`<label class="simple-time-label">Heure de retrait : <select class="simple-time-select" data-simple-time-id="${c.id}" ${disabled}>${simpleTimeOptions(c.TypeCommande,normalizeQuarterHour(c.HeureRetrait||''))}</select></label>`:'';
-  return `<td class="simple-day-cell ${mealClassFor(c.TypeCommande)}"><select class="simple-order-select" data-simple-order-id="${c.id}" ${disabled}>${options}</select>${time}</td>`;
+  const groupClass=group==='RDC'?'simple-rdc':group==='1er étage'?'simple-floor':group==='Professionnel'?'simple-pro':'simple-guest';
+  return `<td class="simple-day-cell ${groupClass} ${mealClassFor(c.TypeCommande)}"><select class="simple-order-select" data-simple-order-id="${c.id}" ${disabled}>${options}</select>${time}</td>`;
 }
 function schoolVacationLabel(vac){const labels={Toussaint:'Vacances de la Toussaint',Noël:'Vacances de Noël',Hiver:"Vacances d’hiver",Printemps:'Vacances de printemps',Été:"Vacances d’été"};return labels[vac?.name]||('Vacances de '+(vac?.name||''))}
 function shortDm(d){return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`}
@@ -475,13 +476,25 @@ function simpleWeekInformationHtml(){
   manual.forEach(x=>parts.push(`<span>🚫 ${esc(x.day.label)} · ${esc(x.closure.reason)} · établissement fermé</span>`));
   return parts.join('<span class="info-sep">•</span>');
 }
+function simpleGroupMeta(group){
+  if(group==='RDC')return{cls:'g-rdc',title:'RDC'};
+  if(group==='1er étage')return{cls:'g-floor',title:'1ER ÉTAGE'};
+  if(group==='Professionnel')return{cls:'g-pro',title:'PROFESSIONNELS'};
+  return{cls:'g-guest',title:'STAGIAIRES / VISITEURS'};
+}
+function simpleGroupTable(group,people,all,archived){
+  if(!people.length)return'';
+  const meta=simpleGroupMeta(group);
+  return `<section class="simple-group ${meta.cls}"><div class="simple-group-title">${meta.title}</div><div class="simple-table-wrap"><table class="simple-table"><thead><tr><th>Personne</th>${DAYS.map(d=>`<th>${d.label}<span>${shortDm(addDays(weekStart,d.offset))}</span></th>`).join('')}</tr></thead><tbody>${people.map(p=>{const rows=all.filter(x=>x.PersonKey===p.PersonKey);return `<tr><td class="simple-person">${simplePersonIdentity(p)}</td>${DAYS.map(d=>simpleCell(rows.find(x=>x.Jour===d.key),archived,group)).join('')}</tr>`}).join('')}</tbody></table></div></section>`;
+}
 function renderSimpleMode(){
   const root=$('simpleEditor');if(!root)return;
   $('simpleWeekTitle').textContent=weekLabel(weekStart);
   const archived=isWeekArchived(currentWeek());
   const all=currentCommands().filter(r=>{if(String(r.PersonKey||'').startsWith('G:'))return true;const cfg=configForPerson(r.PersonKey);return !cfg||cfg.Actif!==false});
   const people=uniquePeople(all).sort(comparePeople);
-  root.innerHTML=`<div class="simple-table-wrap"><table class="simple-table"><thead><tr><th>Personne</th>${DAYS.map(d=>`<th>${d.label}<span>${shortDm(addDays(weekStart,d.offset))}</span></th>`).join('')}</tr></thead><tbody>${people.map(p=>{const rows=all.filter(x=>x.PersonKey===p.PersonKey);return `<tr><td class="simple-person">${simplePersonIdentity(p)}</td>${DAYS.map(d=>simpleCell(rows.find(x=>x.Jour===d.key),archived)).join('')}</tr>`}).join('')}</tbody></table></div>`;
+  const groups=['RDC','1er étage','Professionnel','Stagiaire / Visiteur'];
+  root.innerHTML=groups.map(group=>simpleGroupTable(group,people.filter(p=>p.Groupe===group),all,archived)).join('')||'<p class="hint">Aucune personne à afficher pour cette semaine.</p>';
   document.querySelectorAll('[data-simple-order-id]').forEach(x=>x.onchange=onSimpleOrderDraftChange);
   document.querySelectorAll('[data-simple-time-id]').forEach(x=>x.onchange=onSimpleTimeDraftChange);
   document.querySelectorAll('.simple-avatar-img').forEach(img=>img.onerror=()=>{img.hidden=true;const fallback=img.nextElementSibling;if(fallback)fallback.hidden=false});
