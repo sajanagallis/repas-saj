@@ -455,6 +455,12 @@ function portraitUrlForPerson(person){
   return sourceId?portraitUrlByUserId.get(sourceId)||'':'';
 }
 function simplePersonIdentity(person){
+  // Mode simplifié : aucun portrait ni avatar pour les stagiaires / visiteurs.
+  // Ils sont créés ponctuellement dans Repas_Invites et ne doivent jamais hériter
+  // par erreur du portrait d'un usager portant un identifiant proche.
+  if(person?.Groupe==='Stagiaire / Visiteur'){
+    return `<div class="simple-person-card simple-person-card-no-avatar"><span class="simple-person-name"><b>${esc(person.Prenom||'')} ${esc(person.Nom||'')}</b><small>${esc(statusForPerson(person))}</small></span></div>`;
+  }
   const url=portraitUrlForPerson(person),initials=initialsFor(person);
   const avatar=url?`<img class="simple-avatar-img" src="${esc(url)}" alt="Portrait de ${esc((person.Prenom||'')+' '+(person.Nom||''))}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="simple-avatar-fallback" hidden aria-hidden="true">${esc(initials)}</span>`:`<span class="simple-avatar-fallback" aria-hidden="true">${esc(initials)}</span>`;
   return `<div class="simple-person-card"><span class="simple-avatar">${avatar}</span><span class="simple-person-name"><b>${esc(person.Prenom||'')} ${esc(person.Nom||'')}</b><small>${esc(statusForPerson(person))}</small></span></div>`;
@@ -943,7 +949,59 @@ function summaryGroup(group,band,totalClass,c){
   const total=perDay.reduce((a,b)=>a+b,0);
   return `<section class="print-section"><div class="print-section-title ${band}"><span>${title}</span><span>Total semaine : ${total} repas</span></div><table style="width:100%;table-layout:fixed">${summaryAlignedColgroup()}<thead><tr><th>Profil repas</th>${DAYS.map((d,i)=>`<th>${d.short}<br>${dayMonth(addDays(weekStart,i))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}<tr class="total-row ${totalClass}"><td>Total ${title.toLowerCase()}</td>${perDay.map(n=>`<td class="${n!==0?'meal-count-nonzero':''}">${n}</td>`).join('')}<td>${total}</td></tr></tbody></table></section>`;
 }
-function summaryGuests(c){const rows=c.filter(x=>x.Groupe==='Stagiaire / Visiteur'&&x.TypeCommande==='Repas sur place');if(!rows.length)return'';const perDay=DAYS.map(d=>rows.filter(x=>x.Jour===d.key).length);return `<section class="print-section"><div class="print-section-title band-guest"><span>STAGIAIRES / VISITEURS</span><span>Total semaine : ${perDay.reduce((a,b)=>a+b,0)} repas</span></div><table style="width:100%;table-layout:fixed">${summaryAlignedColgroup()}<tbody><tr class="total-row total-guest"><td>Total stagiaires / visiteurs</td>${perDay.map(n=>`<td>${n}</td>`).join('')}<td>${perDay.reduce((a,b)=>a+b,0)}</td></tr></tbody></table></section>`}
+function summaryGuests(c){
+  const rows=c.filter(x=>x.Groupe==='Stagiaire / Visiteur'&&x.TypeCommande==='Repas sur place');
+  if(!rows.length)return'';
+
+  // Le récapitulatif distingue maintenant le lieu du stagiaire / visiteur.
+  // C'est la seule différence avec la version précédente : les calculs de profils,
+  // de régimes, de textures et de totaux restent identiques.
+  const profileKey=x=>{
+    const personRows=rows.filter(r=>r.PersonKey===x.PersonKey);
+    const eff=effectiveProfile(x.PersonKey,personRows);
+    const floor=guestFloor(x.PersonKey)||'—';
+    return `L|${floor}|${eff.Regime}|${eff.Texture}`;
+  };
+  const profileLabel=key=>{
+    const parts=key.split('|');
+    const floor=parts[1]||'—';
+    const diet=parts[2]||'Normal';
+    const texture=parts[3]||'Normale';
+    const specialDiet=norm(diet)!=='normal';
+    const specialTexture=norm(texture)!=='normale';
+    let profile='';
+    if(specialDiet&&specialTexture) profile=`${pill(diet,'diet')} <span class="profile-plus">+</span> ${pill(texture,'texture')}`;
+    else if(specialDiet) profile=pill(diet,'diet');
+    else if(specialTexture) profile=pill(texture,'texture');
+    else profile=pill('Normal','diet');
+    return `<b>${esc(floor)}</b> — ${profile}`;
+  };
+  const orderKey=key=>{
+    const parts=key.split('|'),floor=parts[1]||'—',diet=parts[2]||'Normal',texture=parts[3]||'Normale';
+    const floorOrder=floor==='RDC'?0:floor==='1er étage'?1:2;
+    const d=DIETS.findIndex(v=>norm(v)===norm(diet));
+    const t=TEXTURES.findIndex(v=>norm(v)===norm(texture));
+    const specialD=norm(diet)!=='normal',specialT=norm(texture)!=='normale';
+    const bucket=!specialD&&!specialT?0:specialD&&!specialT?1:!specialD&&specialT?2:3;
+    return [floorOrder,bucket,d<0?99:d,t<0?99:t];
+  };
+  const cmpKey=(a,b)=>{
+    const A=orderKey(a),B=orderKey(b);
+    for(let i=0;i<A.length;i++)if(A[i]!==B[i])return A[i]-B[i];
+    return a.localeCompare(b,'fr');
+  };
+
+  const keys=[...new Set(rows.map(profileKey))].sort(cmpKey);
+
+  const body=keys.map(key=>{
+    const pred=x=>profileKey(x)===key;
+    return `<tr><td>${profileLabel(key)}</td>${DAYS.map(d=>{const n=rows.filter(x=>x.Jour===d.key&&pred(x)).length;return `<td class="${n!==0?'meal-count-nonzero':''}">${n}</td>`}).join('')}<td>${rows.filter(pred).length}</td></tr>`;
+  }).join('');
+
+  const perDay=DAYS.map(d=>rows.filter(x=>x.Jour===d.key).length);
+  const total=perDay.reduce((a,b)=>a+b,0);
+  return `<section class="print-section"><div class="print-section-title band-guest"><span>STAGIAIRES / VISITEURS</span><span>Total semaine : ${total} repas</span></div><table style="width:100%;table-layout:fixed">${summaryAlignedColgroup()}<thead><tr><th>Lieu / profil repas</th>${DAYS.map((d,i)=>`<th>${d.short}<br>${dayMonth(addDays(weekStart,i))}</th>`).join('')}<th>Total</th></tr></thead><tbody>${body}<tr class="total-row total-guest"><td>Total stagiaires / visiteurs</td>${perDay.map(n=>`<td class="${n!==0?'meal-count-nonzero':''}">${n}</td>`).join('')}<td>${total}</td></tr></tbody></table></section>`;
+}
 function specialSummaryCards(c){
   const defs=[['Plateau','PLATEAUX','band-tray','total-tray'],['Container','CONTAINERS','band-container','total-container'],['Pique-nique','PIQUE-NIQUES','band-picnic','total-picnic']];
   const cards=defs.map(([type,title,band,totalCls])=>{const rows=c.filter(x=>x.TypeCommande===type);if(!rows.length)return'';const perDay=DAYS.map(d=>rows.filter(x=>x.Jour===d.key).length);const total=perDay.reduce((a,b)=>a+b,0);return `<section class="print-section compact-special"><div class="print-section-title ${band}"><span>${title}</span><span>${total}</span></div><table><thead><tr>${DAYS.map(d=>`<th>${d.label}</th>`).join('')}<th>Total</th></tr></thead><tbody><tr class="total-row ${totalCls}">${perDay.map(n=>`<td>${n}</td>`).join('')}<td>${total}</td></tr></tbody></table></section>`}).filter(Boolean);
